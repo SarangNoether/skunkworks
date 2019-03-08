@@ -14,6 +14,10 @@ b = 256
 q = 2**255 - 19
 l = 2**252 + 27742317777372353535851937790883648493
 
+# Set random seet
+def set_seed(seed):
+    random.seed(seed)
+
 # Internal helper methods
 def exponent(b,e,m):
     return pow(b,e,m)

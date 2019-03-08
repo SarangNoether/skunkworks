@@ -249,5 +249,105 @@ class TestInvalidBatch(unittest.TestCase):
         with self.assertRaises(ArithmeticError):
             pybullet.verify(proofs)
 
-for test in [TestBulletOps,TestValidProofs,TestBadChallenges,TestBadIndex,TestBadValues,TestValidBatch,TestInvalidBatch]:
+class TestKnownProofs(unittest.TestCase):
+    # Test a proof manually
+    def test_v_2_n_2_k_0(self):
+        # A-proof
+        seed = 1 # arbitrary
+        v = Scalar(2)
+        gamma = Scalar(23579) # abitrary commitment blinder
+        pybullet.N = 2
+
+        dumb25519.set_seed(seed)
+        alpha = random_scalar()
+        sL = ScalarVector([random_scalar()]*pybullet.N)
+        sR = ScalarVector([random_scalar()]*pybullet.N)
+        rho = random_scalar()
+
+        # fixed points
+        H = hash_to_point('pybullet H')
+        Gi = [hash_to_point('pybullet Gi '+str(i)) for i in range(pybullet.N)]
+        Hi = [hash_to_point('pybullet Hi '+str(i)) for i in range(pybullet.N)]
+
+        # proof elements
+        A = (G*alpha + Gi[1] - Hi[0])*Scalar(8).invert()
+        S = (G*rho + Gi[0]*sL[0] + Gi[1]*sL[1] + Hi[0]*sR[0] + Hi[1]*sR[1])*Scalar(8).invert()
+
+        proof_A,state = pybullet.prove_A(v,gamma,0,seed=seed)
+        self.assertEqual(proof_A.A,A)
+        self.assertEqual(proof_A.S,S)
+
+        # B-proof
+        seed = 2 # arbitrary
+        dumb25519.set_seed(seed)
+        y = Scalar(8675309) # arbitrary nonzero challenge
+        z = Scalar(3141592) # arbitrary nonzero challenge
+
+        l0 = ScalarVector([-z,Scalar(1)-z])
+        l1 = sL
+        r0 = ScalarVector([Scalar(-1)+z+z**2,y*z+Scalar(2)*z**2])
+        r1 = ScalarVector([sR[0],y*sR[1]])
+
+        t1 = l0**r1 + l1**r0
+        t2 = l1**r1
+
+        tau1 = random_scalar()
+        tau2 = random_scalar()
+        T1 = (H*t1 + G*tau1)*Scalar(8).invert()
+        T2 = (H*t2 + G*tau2)*Scalar(8).invert()
+
+        proof_B,state = pybullet.prove_B(state,y,z,seed=seed)
+        self.assertEqual(proof_B.T1,T1)
+        self.assertEqual(proof_B.T2,T2)
+
+        # C-proof
+        seed = 3 # arbitrary
+        dumb25519.set_seed(seed)
+        x = Scalar(2718281) # arbitrary nonzero challenge
+
+        taux = tau2*x**2 + tau1*x + z**2*gamma
+        mu = alpha + rho*x
+        l = l0 + l1*x
+        r = r0 + r1*x
+
+        proof_C = pybullet.prove_C(state,x,seed=seed)
+        self.assertEqual(proof_C.taux,taux)
+        self.assertEqual(proof_C.mu,mu)
+        self.assertEqual(proof_C.l[0],l[0])
+        self.assertEqual(proof_C.l[1],l[1])
+        self.assertEqual(proof_C.r[0],r[0])
+        self.assertEqual(proof_C.r[1],r[1])
+
+        # inner product
+        pybullet.cache = x
+        pybullet.mash(taux)
+        pybullet.mash(mu)
+        pybullet.mash(l**r)
+        x_ip = pybullet.cache
+
+        L = (Gi[1]*l[0] + Hi[0]*r[1] + H*(l[0]*r[1]*x_ip))*Scalar(8).invert()
+        R = (Gi[0]*l[1] + Hi[1]*(r[0]*y.invert()) + H*(l[1]*r[0]*x_ip))*Scalar(8).invert()
+        pybullet.mash(L)
+        pybullet.mash(R)
+        w = pybullet.cache
+
+        a = l[0]*w + l[1]*w.invert()
+        b = r[0]*w.invert() + r[1]*w
+
+        # check against final proof
+        proof = pybullet.aggregate_A([proof_A])
+        proof.y = y
+        proof.z = z
+        proof = pybullet.aggregate_B([proof_B],proof)
+        proof.x = x
+        proof = pybullet.aggregate_C([proof_C],proof)
+
+        self.assertEqual(proof.t,l**r)
+        self.assertEqual(proof.a,a)
+        self.assertEqual(proof.b,b)
+        self.assertEqual(proof.L[0],L)
+        self.assertEqual(proof.R[0],R)
+
+#for test in [TestBulletOps,TestValidProofs,TestBadChallenges,TestBadIndex,TestBadValues,TestValidBatch,TestInvalidBatch,TestKnownProofs]:
+for test in [TestKnownProofs]:
     unittest.TextTestRunner(verbosity=2,failfast=True).run(unittest.TestLoader().loadTestsFromTestCase(test))

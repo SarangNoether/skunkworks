@@ -155,9 +155,13 @@ def inner_product(data):
 # V: amount value
 # gamma: mask
 # k: player index
+# seed: if set, random seed
 #
 # returns: ProofA object
-def prove_A(v,gamma,k):
+def prove_A(v,gamma,k,seed=None):
+    if seed is not None:
+        dumb25519.set_seed(seed)
+
     # internal state
     state = PlayerState()
     state.k = k
@@ -204,9 +208,13 @@ def prove_A(v,gamma,k):
 # Generate a B-proof
 # state: player state (PlayerState)
 # y,z: dealer challenges
+# seed: if set, random seed
 #
 # returns: ProofB object
-def prove_B(state,y,z):
+def prove_B(state,y,z,seed=None):
+    if seed is not None:
+        dumb25519.set_seed(seed)
+
     # check for bad challenges
     if y == Scalar(0) or z == Scalar(0):
         raise ValueError('Bad challenge!')
@@ -260,9 +268,13 @@ def prove_B(state,y,z):
 # Generate a C-proof
 # state: player state (PlayerState)
 # x: dealer challenge
+# seed: if set, random seed
 #
 # returns: ProofC object
-def prove_C(state,x):
+def prove_C(state,x,seed=None):
+    if seed is not None:
+        dumb25519.set_seed(seed)
+
     # check for bad challenge
     if x == Scalar(0):
         raise ValueError('Bad challenge!')
