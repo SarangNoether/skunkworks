@@ -348,6 +348,5 @@ class TestKnownProofs(unittest.TestCase):
         self.assertEqual(proof.L[0],L)
         self.assertEqual(proof.R[0],R)
 
-#for test in [TestBulletOps,TestValidProofs,TestBadChallenges,TestBadIndex,TestBadValues,TestValidBatch,TestInvalidBatch,TestKnownProofs]:
-for test in [TestKnownProofs]:
+for test in [TestBulletOps,TestValidProofs,TestBadChallenges,TestBadIndex,TestBadValues,TestValidBatch,TestInvalidBatch,TestKnownProofs]:
     unittest.TextTestRunner(verbosity=2,failfast=True).run(unittest.TestLoader().loadTestsFromTestCase(test))
