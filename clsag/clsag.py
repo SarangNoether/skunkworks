@@ -50,8 +50,8 @@ def sign(M,p,P,z,C,index=None):
     D = hash_to_point(P[l])*z
 
     # Now generate the signature
-    mu_P = hash_to_scalar(0,P,I,D)
-    mu_C = hash_to_scalar(1,P,I,D)
+    mu_P = hash_to_scalar(0,P,I,C,D)
+    mu_C = hash_to_scalar(1,P,I,C,D)
     h = [None]*n
     alpha = random_scalar()
     s = [random_scalar()]*n
@@ -101,8 +101,8 @@ def verify(M,P,C,sig):
 
     # Reconstruct the commitments
     h = [None]*n
-    mu_P = hash_to_scalar(0,P,I,D)
-    mu_C = hash_to_scalar(1,P,I,D)
+    mu_P = hash_to_scalar(0,P,I,C,D)
+    mu_C = hash_to_scalar(1,P,I,C,D)
 
     for i in range(0,n):
         if i == 0:
