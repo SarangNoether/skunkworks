@@ -81,7 +81,7 @@ def sign(M,p,P,z,C,index=None):
 
     return sig
 
-# Verify an MLSAG signature
+# Verify a CLSAG signature
 # INPUTS
 #   M: message
 #   P: public key vector
