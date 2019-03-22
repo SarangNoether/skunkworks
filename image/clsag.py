@@ -72,7 +72,7 @@ def sign(M,p,P,t,z,C,index=None):
         R = hash_to_point(P[l])*alpha
     else:
         R = H*alpha
-    h[(l+1) % n] = hash_to_scalar(L,R)
+    h[(l+1) % n] = hash_to_scalar(M,L,R)
    
     # Decoy indices
     if n > 1:
@@ -83,7 +83,7 @@ def sign(M,p,P,t,z,C,index=None):
                 R = hash_to_point(P[i])*s[i] + h[i]*(I*mu_P + D*mu_C)
             else:
                 R = H*s[i] + h[i]*(I*mu_P + D*mu_C)
-            h[(i+1) % n] = hash_to_scalar(L,R)
+            h[(i+1) % n] = hash_to_scalar(M,L,R)
 
     # Final scalar computation
     s[l] = alpha - h[l]*(mu_P*p + mu_C*z)
@@ -131,7 +131,7 @@ def verify(M,P,t,C,sig):
             R = hash_to_point(P[i%n])*s[i%n] + temp_h*(I*mu_P + D*mu_C)
         else:
             R = H*s[i%n] + temp_h*(I*mu_P + D*mu_C)
-        h[(i+1)%n] = hash_to_scalar(L,R)
+        h[(i+1)%n] = hash_to_scalar(M,L,R)
 
     # Final check
     if not h[0] == h0:

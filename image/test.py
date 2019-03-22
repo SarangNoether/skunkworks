@@ -310,6 +310,5 @@ class TestTransaction(unittest.TestCase):
         if not C_pseudo-C_out[0]-C_out[1] == Z:
             raise ArithmeticError('Failed transaction balance check!')
 
-#for test in [TestValidSignatures,TestBadPoints,TestTransaction]:
-for test in [TestTransaction]:
+for test in [TestValidSignatures,TestBadPoints,TestTransaction]:
     unittest.TextTestRunner(verbosity=2,failfast=True).run(unittest.TestLoader().loadTestsFromTestCase(test))
