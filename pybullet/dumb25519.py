@@ -14,10 +14,6 @@ b = 256
 q = 2**255 - 19
 l = 2**252 + 27742317777372353535851937790883648493
 
-# Set random seet
-def set_seed(seed):
-    random.seed(seed)
-
 # Internal helper methods
 def exponent(b,e,m):
     return pow(b,e,m)
@@ -185,7 +181,7 @@ class Point:
         return self*y
 
     def __str__(self):
-        return str(self.x) + str(self.y)
+        return str(self.x) + '|' +  str(self.y)
 
     # determines if the point is on the curve
     def on_curve(self):
@@ -361,13 +357,18 @@ def hash_to_scalar(*data):
     for datum in data:
         if datum is None:
             raise TypeError
+        if type(datum) == type([]):
+            temp = ''
+            for item in datum:
+                temp += hashlib.sha256(str(item)).hexdigest()
+            datum = temp
         result += hashlib.sha256(str(datum)).hexdigest()
     
     # ensure we're uniformly in the scalar range
     while True:
+        result = hashlib.sha256(result).hexdigest()
         if int(result,16) < l:
             return Scalar(int(result,16))
-        result = hashlib.sha256(result).hexdigest()
 
 # generate a random scalar
 def random_scalar(zero=True):
