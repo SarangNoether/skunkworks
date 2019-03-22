@@ -181,7 +181,7 @@ class Point:
         return self*y
 
     def __str__(self):
-        return str(self.x) + str(self.y)
+        return str(self.x) + '|' +  str(self.y)
 
     # determines if the point is on the curve
     def on_curve(self):
@@ -357,13 +357,18 @@ def hash_to_scalar(*data):
     for datum in data:
         if datum is None:
             raise TypeError
+        if type(datum) == type([]):
+            temp = ''
+            for item in datum:
+                temp += hashlib.sha256(str(item)).hexdigest()
+            datum = temp
         result += hashlib.sha256(str(datum)).hexdigest()
     
     # ensure we're uniformly in the scalar range
     while True:
+        result = hashlib.sha256(result).hexdigest()
         if int(result,16) < l:
             return Scalar(int(result,16))
-        result = hashlib.sha256(result).hexdigest()
 
 # generate a random scalar
 def random_scalar(zero=True):
@@ -386,8 +391,8 @@ Z = Point(0,1)
 # multiexponention operation using simplified Pippenger
 def multiexp(*data):
     if len(data) == 1:
-        scalars = ScalarVector([datum[1] for datum in data[0]])
-        points = PointVector([datum[0] for datum in data[0]])
+        scalars = [datum[1] for datum in data[0]]
+        points = [datum[0] for datum in data[0]]
     else:
         scalars = data[0]
         points = data[1]
