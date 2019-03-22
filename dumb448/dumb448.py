@@ -179,7 +179,7 @@ class Point:
         return self*y
 
     def __str__(self):
-        return str(self.x) + str(self.y)
+        return str(self.x) + '|' + str(self.y)
 
     # determines if the point is on the curve
     def on_curve(self):
@@ -355,6 +355,11 @@ def hash_to_scalar(*data):
     for datum in data:
         if datum is None:
             raise TypeError
+        if type(datum) == type([]):
+            temp = ''
+            for item in datum:
+                temp += hashlib.sha256(str(item)).hexdigest()
+            datum = temp
         result += hashlib.sha512(str(datum)).hexdigest()
 
     # ensure we're uniformly in the scalar range
