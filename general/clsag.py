@@ -71,8 +71,8 @@ def sign(M,p,P):
             L = G*s[i]
             R = H*s[i]
             for j in range(m):
-                L += P[i][j]*h[i]*mu[j]
-                R += I[j]*h[i]*mu[j]
+                L += P[i][j]*(h[i]*mu[j])
+                R += I[j]*(h[i]*mu[j])
             h[(i+1) % n] = hash_to_scalar(M,L,R)
 
     # Final scalar computation
@@ -119,8 +119,8 @@ def verify(M,P,sig):
         L = G*s[i%n]
         R = H*s[i%n]
         for j in range(m):
-            L += P[i%n][j]*temp_h*mu[j]
-            R += I[j]*temp_h*mu[j]
+            L += P[i%n][j]*(temp_h*mu[j])
+            R += I[j]*(temp_h*mu[j])
         h[(i+1)%n] = hash_to_scalar(M,L,R)
 
     # Final check

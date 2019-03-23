@@ -65,8 +65,8 @@ def sign(M,p,P,z,C,index=None):
     if n > 1:
         for i in range(l+1,l+n):
             i = i % n
-            L = G*s[i] + h[i]*(P[i]*mu_P + C[i]*mu_C)
-            R = hash_to_point(P[i])*s[i] + h[i]*(I*mu_P + D*mu_C)
+            L = G*s[i] + P[i]*(h[i]*mu_P) + C[i]*(h[i]*mu_C)
+            R = hash_to_point(P[i])*s[i] + I*(h[i]*mu_P) + D*(h[i]*mu_C)
             h[(i+1) % n] = hash_to_scalar(M,L,R)
 
     # Final scalar computation
@@ -109,8 +109,8 @@ def verify(M,P,C,sig):
             temp_h = h0
         else:
             temp_h = h[i]
-        L = G*s[i%n] + temp_h*(P[i%n]*mu_P + C[i%n]*mu_C)
-        R = hash_to_point(P[i%n])*s[i%n] + temp_h*(I*mu_P + D*mu_C)
+        L = G*s[i%n] + P[i%n]*(temp_h*mu_P) + C[i%n]*(temp_h*mu_C)
+        R = hash_to_point(P[i%n])*s[i%n] + I*(temp_h*mu_P) + D*(temp_h*mu_C)
         h[(i+1)%n] = hash_to_scalar(M,L,R)
 
     # Final check
