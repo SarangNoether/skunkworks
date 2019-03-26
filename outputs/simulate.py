@@ -18,6 +18,7 @@ parser.add_argument('--chain_size',default=500000,type=int,help='Number of block
 parser.add_argument('--block_time',default=120,type=int,help='Block time in seconds')
 parser.add_argument('--chain_data',help='Path to chain data file; each line is the number of outputs in a block')
 parser.add_argument('--window',default=5,type=int,help='Number of blocks in half window')
+parser.add_argument('--lineup_window',default=0,type=int,help='Number of blocks in output lineup window')
 parser.add_argument('-N',default=10000,type=int,help='Number of outputs to select')
 parser.add_argument('--density',required=True,choices=['real','geometric','feast','famine'],help='Chain density model')
 parser.add_argument('--selection',required=True,choices=['partial','full','lineup','bias'],help='Output selection algorithm')
@@ -125,7 +126,7 @@ def select_full():
 
 # Make a selection using an output-lineup method
 def select_lineup():
-    output_time = args.block_time*args.chain_size/chain_sum # average time per output
+    output_time = args.block_time*args.lineup_window/window_sum # average time per output
 
     # Keep trying until we select a valid output
     while True:
@@ -183,6 +184,10 @@ def select_bias():
 print('Initializing chain...')
 chain = generate_chain()
 chain_sum = sum(chain) # total outputs on the chain
+if args.lineup_window == 0 or args.lineup_window >= len(chain):
+    window_sum = chain_sum
+else:
+    window_sum = sum(chain[:args.lineup_window])
 chain_types = [0]*args.types # outputs on the chain by type
 for i in chain:
     if i in range(1,args.types+1):
