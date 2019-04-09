@@ -108,7 +108,7 @@ def prove(M,l,v,r,n,m):
     rD = random_scalar()
 
     # Commit to zero-sum blinders
-    a = [[Scalar(0)]*n]*m
+    a = [[random_scalar()]*n for _ in range(m)]
     for j in range(m):
         a[j][0] = Scalar(0)
         for i in range(1,n):
@@ -117,28 +117,28 @@ def prove(M,l,v,r,n,m):
 
     # Commit to decomposition bits
     decomp_l = decompose(l,n,m)
-    sigma = [[Scalar(0)]*n]*m
+    sigma = [[None]*n for _ in range(m)]
     for j in range(m):
         for i in range(n):
             sigma[j][i] = delta(decomp_l[j],i)
     B = com_matrix(sigma,rB)
 
     # Commit to a/sigma relationships
-    a_sigma = [[Scalar(0)]*n]*m
+    a_sigma = [[Scalar(0)]*n for _ in range(m)]
     for j in range(m):
         for i in range(n):
             a_sigma[j][i] = a[j][i]*(Scalar(1) - Scalar(2)*sigma[j][i])
     C = com_matrix(a_sigma,rC)
     
     # Commit to squared a-values
-    a_sq = [[Scalar(0)]*n]*m
+    a_sq = [[Scalar(0)]*n for _ in range(m)]
     for j in range(m):
         for i in range(n):
             a_sq[j][i] = -a[j][i]*a[j][i]
     D = com_matrix(a_sq,rD)
 
     # Compute p coefficients
-    p = [[Scalar(0)]*m]*N
+    p = [[Scalar(0)]*m for _ in range(N)]
     for k in range(N):
         decomp_k = decompose(k,n,m)
         p[k] = [a[0][decomp_k[0]],delta(decomp_l[0],decomp_k[0])]
@@ -163,7 +163,7 @@ def prove(M,l,v,r,n,m):
     # Fiat-Shamir challenge
     x = hash_to_scalar(A,B,C,D,G,Q)
 
-    f = [[None]*n]*m
+    f = [[None]*n for _ in range(m)]
     for j in range(m):
         for i in range(1,n):
             f[j][i] = sigma[j][i]*x + a[j][i]
@@ -228,7 +228,7 @@ def verify(M,proof,n,m):
         raise ArithmeticError('Failed A/B check!')
 
     # C/D check
-    fx = [[None]*n]*m
+    fx = [[None]*n for _ in range(m)]
     for j in range(m):
         for i in range(n):
             fx[j][i] = f[j][i]*(x-f[j][i])
