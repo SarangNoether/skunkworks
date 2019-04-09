@@ -126,5 +126,17 @@ class TestGroth(unittest.TestCase):
         proof = groth.prove(M,l,v[l],r[l],n,m)
         groth.verify(M,proof,n,m)
 
+    def test_8_all(self):
+        n = 2
+        m = 3
+        N = n**m
+        v = [random_scalar()]*N
+        r = [random_scalar()]*N
+        for l in range(N):
+            M = [groth.comm(random_scalar(),v[i],r[i]) for i in range(N)]
+            M[l] = groth.comm(Scalar(0),v[l],r[l])
+            proof = groth.prove(M,l,v[l],r[l],n,m)
+            groth.verify(M,proof,n,m)
+
 for test in [TestBulletOps,TestBullet,TestSchnorr,TestGroth]:
     unittest.TextTestRunner(verbosity=2,failfast=True).run(unittest.TestLoader().loadTestsFromTestCase(test))

@@ -118,9 +118,9 @@ def prove(data,N):
     M = len(data)
 
     # curve points
-    G1 = hash_to_point('G1')
-    G2 = hash_to_point('G2')
-    H = hash_to_point('H')
+    G1 = hash_to_point('H1') # this is to match other protocols
+    G2 = hash_to_point('H2') # this is to match other protocols
+    H = hash_to_point('G') # this is to match other protocols
     Gi = PointVector([hash_to_point('Gi ' + str(i)) for i in range(M*N)])
     Hi = PointVector([hash_to_point('Hi ' + str(i)) for i in range(M*N)])
 
@@ -250,9 +250,9 @@ def verify(proofs,N):
 
     # curve points
     Z = dumb25519.Z
-    G1 = hash_to_point('G1')
-    G2 = hash_to_point('G2')
-    H = hash_to_point('H')
+    G1 = hash_to_point('H1')
+    G2 = hash_to_point('H2')
+    H = hash_to_point('G')
     Gi = PointVector([hash_to_point('Gi ' + str(i)) for i in range(max_MN)])
     Hi = PointVector([hash_to_point('Hi ' + str(i)) for i in range(max_MN)])
 
