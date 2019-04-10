@@ -29,8 +29,8 @@ def com_matrix(v,r):
     return C
 
 # Double-blinded Pedersen commitment
-def comm(v,r,s):
-    return G*v + H1*r + H2*s
+def comm(s,v,r):
+    return G*s + H1*v + H2*r
 
 # Decompose a value with given base and size
 def decompose(val,base,size,t=int):
@@ -92,6 +92,7 @@ def convolve(x,y,size=None):
 #  n,m: dimensions such that len(M) == n**m
 # RETURNS
 #  proof structure
+#  gammas: list of gamma values (not part of public proof; needed to prove balance later))
 def prove(M,l,v,r,n,m):
     # Size check
     if not len(M) == n**m:
@@ -151,10 +152,12 @@ def prove(M,l,v,r,n,m):
     Q = [dumb25519.Z]*m
     rho = [None]*m
     tau = [None]*m
+    gammas = [None]*m
     for j in range(m):
         rho[j] = random_scalar()
         tau[j] = random_scalar()
         gamma = random_scalar()
+        gammas[j] = gamma
         for i in range(N):
             G[j] += M[i]*p[i][j]
         G[j] -= H2*gamma
@@ -190,7 +193,7 @@ def prove(M,l,v,r,n,m):
     proof.zV = zV
     proof.zR = zR
 
-    return proof
+    return proof,gammas
 
 # Verify a commitment-to-zero proof
 #
