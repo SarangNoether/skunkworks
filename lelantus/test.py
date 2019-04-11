@@ -5,6 +5,7 @@ from dumb25519 import Z, G, Point, Scalar, PointVector, ScalarVector, random_poi
 import pybullet
 import schnorr
 import groth
+import signature
 import random
 import unittest
 
@@ -138,5 +139,29 @@ class TestGroth(unittest.TestCase):
             proof = groth.prove(M,l,v[l],r[l],n,m)
             groth.verify(M,proof,n,m)
 
-for test in [TestBulletOps,TestBullet,TestSchnorr,TestGroth]:
+class TestSignature(unittest.TestCase):
+    def test_random_key(self):
+        m = 'Test message'
+        x = random_scalar()
+        X = G*x
+
+        signature.verify(m,X,signature.sign(m,x))
+
+    def test_bad_key(self):
+        m = 'Test message'
+        x = random_scalar()
+        X = random_point()
+
+        with self.assertRaises(ArithmeticError):
+            signature.verify(m,X,signature.sign(m,x))
+
+    def test_zero_key(self):
+        m = 'Test message'
+        x = Scalar(0)
+        X = G*x
+
+        with self.assertRaises(ValueError):
+            signature.sign(m,x)
+        
+for test in [TestBulletOps,TestBullet,TestSchnorr,TestGroth, TestSignature]:
     unittest.TextTestRunner(verbosity=2,failfast=True).run(unittest.TestLoader().loadTestsFromTestCase(test))

@@ -3,7 +3,7 @@
 # Shows that the prover knows s,t such that Y = s*G + t*H for public Y,G,H
 
 import dumb25519
-from dumb25519 import Scalar, Point, random_scalar, hash_to_scalar, hash_to_point
+from dumb25519 import Scalar, Point, random_scalar, hash_to_scalar
 
 # Schnorr proof
 class Proof:
