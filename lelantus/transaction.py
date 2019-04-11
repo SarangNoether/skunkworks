@@ -4,6 +4,7 @@ from dumb25519 import *
 import groth
 import pybullet
 import schnorr
+import signature
 
 # Mint a new coin
 print 'Minting a new coin...'
@@ -33,6 +34,14 @@ Coins[l] = C # the real coin
 print 'Generating spend proof...'
 M = [coin - groth.comm(s,Scalar(0),Scalar(0)) for coin in Coins]
 spend_proof,gammas = groth.prove(M,l,v,r,n,m)
+
+# Sign the spend proof
+print 'Signing spend proof...'
+spend_sig = signature.sign(str(spend_proof),q)
+
+# Publicly verify the spend proof
+print 'Verifying spend proof signature...'
+signature.verify(str(spend_proof),Q,spend_sig)
 
 # Publicly verify the spend
 print 'Verifying spend proof...'

@@ -20,6 +20,12 @@ class Proof:
     zV = None
     zR = None
 
+    def __str__(self):
+        str_G = '|'.join([str(X) for X in self.G])
+        str_Q = '|'.join([str(X) for X in self.Q])
+        str_f = '|'.join(['|'.join([str(y) for y in x]) for x in self.f])
+        return '|'.join([str(x) for x in [self.A,self.B,self.C,self.D,str_G,str_Q,str_f,self.zA,self.zC,self.zV,self.zR]])
+
 # Double-blinded Pedersen matrix commitment
 def com_matrix(v,r):
     C = dumb25519.Z
