@@ -118,6 +118,8 @@ class TestOthers(unittest.TestCase):
         hash_to_scalar(8675309)
         hash_to_point('The Human Fund: Money For People',G,8675309)
         hash_to_scalar('The Human Fund: Money For People',G,8675309)
+        hash_to_point([Scalar(0),Scalar(1),G])
+        hash_to_scalar([Scalar(0),Scalar(1),G])
 
         with self.assertRaises(TypeError):
             hash_to_scalar(None)

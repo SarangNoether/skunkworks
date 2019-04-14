@@ -10,7 +10,6 @@ import hashlib
 VERSION = 0.2 # to help with compatibility
 
 # curve parameters
-b = 456
 q = 2**448 - 2**224 - 1
 l = 2**446 - 13818066809895115352007386748515426880336692474882178609894547503885
 cofactor = 4
@@ -105,8 +104,8 @@ class Scalar:
             return self.x >= y.x
         raise TypeError
 
-    def __str__(self):
-        return str(self.x)
+    def __repr__(self):
+        return '<Scalar> x:'+str(self.x)
 
     def __int__(self):
         return self.x
@@ -178,8 +177,8 @@ class Point:
             return NotImplemented
         return self*y
 
-    def __str__(self):
-        return str(self.x) + '|' + str(self.y)
+    def __repr__(self):
+        return '<Point> x:'+str(self.x)+'|y:'+str(self.y)
 
     # determines if the point is on the curve
     def on_curve(self):
@@ -238,6 +237,9 @@ class PointVector:
             if not isinstance(item,Point):
                 raise TypeError
             self.points.append(item)
+
+    def __repr__(self):
+        return repr(self.points)
 
 class ScalarVector:
     def __init__(self,scalars):
@@ -307,6 +309,9 @@ class ScalarVector:
                 raise TypeError
             self.scalars.append(item)
 
+    def __repr__(self):
+        return repr(self.scalars)
+
     # return a vector of inverses
     def invert(self):
         inputs = self.scalars[:]
@@ -355,20 +360,14 @@ def hash_to_scalar(*data):
     for datum in data:
         if datum is None:
             raise TypeError
-        if type(datum) == type([]):
-            temp = ''
-            for item in datum:
-                temp += hashlib.sha256(str(item)).hexdigest()
-            datum = temp
         result += hashlib.sha512(str(datum)).hexdigest()
 
     # ensure we're uniformly in the scalar range
-    result = int(bin(int(result,16))[-446:],2)
     while True:
-        if result < l:
-            return Scalar(result)
         result = hashlib.sha256(str(result)).hexdigest()
         result = int(bin(int(result,16))[-446:],2)
+        if result < l:
+            return Scalar(result)
 
 # generate a random scalar
 def random_scalar(zero=True):
