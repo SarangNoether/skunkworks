@@ -1,9 +1,6 @@
 import dumb25519
 from dumb25519 import Scalar, Point, ScalarVector, PointVector, random_scalar, random_point, hash_to_scalar, hash_to_point
 
-if not dumb25519.VERSION == 0.2:
-    raise Exception('Library version mismatch!')
-
 cache = '' # rolling transcript hash
 inv8 = Scalar(8).invert()
 
