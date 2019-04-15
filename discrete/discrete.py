@@ -9,9 +9,6 @@
 import dumb25519
 import dumb448
 
-if not dumb25519.VERSION == 0.2 or not dumb448.VERSION == 0.2:
-    raise Exception('Library version mismatch!')
-
 max_x = min(dumb25519.l,dumb448.l) # max scalar permitted as discrete log
 
 # Proof structure
