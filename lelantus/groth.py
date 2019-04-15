@@ -20,11 +20,20 @@ class Proof:
     zV = None
     zR = None
 
-    def __str__(self):
-        str_G = '|'.join([str(X) for X in self.G])
-        str_Q = '|'.join([str(X) for X in self.Q])
-        str_f = '|'.join(['|'.join([str(y) for y in x]) for x in self.f])
-        return '|'.join([str(x) for x in [self.A,self.B,self.C,self.D,str_G,str_Q,str_f,self.zA,self.zC,self.zV,self.zR]])
+    def __repr__(self):
+        temp = '<GrothProof> '
+        temp += 'A:'+repr(self.A)+'|'
+        temp += 'B:'+repr(self.B)+'|'
+        temp += 'C:'+repr(self.C)+'|'
+        temp += 'D:'+repr(self.D)+'|'
+        temp += 'G:'+repr(self.G)+'|'
+        temp += 'Q:'+repr(self.Q)+'|'
+        temp += 'f:'+repr(self.f)+'|'
+        temp += 'zA:'+repr(self.zA)+'|'
+        temp += 'zC:'+repr(self.zC)+'|'
+        temp += 'zV:'+repr(self.zV)+'|'
+        temp += 'zR:'+repr(self.zR)
+        return temp
 
 # Double-blinded Pedersen matrix commitment
 def com_matrix(v,r):

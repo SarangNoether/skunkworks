@@ -100,7 +100,7 @@ class TestGroth(unittest.TestCase):
         n = 1
         m = 1
         l = 0
-        proof = groth.prove(M,l,v,r,n,m)
+        proof,gammas = groth.prove(M,l,v,r,n,m)
         groth.verify(M,proof,n,m)
 
     def test_2_0(self):
@@ -112,7 +112,7 @@ class TestGroth(unittest.TestCase):
         r = [random_scalar()]*N
         M = [groth.comm(random_scalar(),v[i],r[i]) for i in range(N)]
         M[l] = groth.comm(Scalar(0),v[l],r[l])
-        proof = groth.prove(M,l,v[l],r[l],n,m)
+        proof,gammas = groth.prove(M,l,v[l],r[l],n,m)
         groth.verify(M,proof,n,m)
 
     def test_2_1(self):
@@ -124,7 +124,7 @@ class TestGroth(unittest.TestCase):
         r = [random_scalar()]*N
         M = [groth.comm(random_scalar(),v[i],r[i]) for i in range(N)]
         M[l] = groth.comm(Scalar(0),v[l],r[l])
-        proof = groth.prove(M,l,v[l],r[l],n,m)
+        proof,gammas = groth.prove(M,l,v[l],r[l],n,m)
         groth.verify(M,proof,n,m)
 
     def test_8_all(self):
@@ -136,7 +136,7 @@ class TestGroth(unittest.TestCase):
         for l in range(N):
             M = [groth.comm(random_scalar(),v[i],r[i]) for i in range(N)]
             M[l] = groth.comm(Scalar(0),v[l],r[l])
-            proof = groth.prove(M,l,v[l],r[l],n,m)
+            proof,gammas = groth.prove(M,l,v[l],r[l],n,m)
             groth.verify(M,proof,n,m)
 
 class TestSignature(unittest.TestCase):
@@ -163,5 +163,5 @@ class TestSignature(unittest.TestCase):
         with self.assertRaises(ValueError):
             signature.sign(m,x)
         
-for test in [TestBulletOps,TestBullet,TestSchnorr,TestGroth, TestSignature]:
+for test in [TestBulletOps,TestBullet,TestSchnorr,TestGroth,TestSignature]:
     unittest.TextTestRunner(verbosity=2,failfast=True).run(unittest.TestLoader().loadTestsFromTestCase(test))

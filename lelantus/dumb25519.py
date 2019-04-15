@@ -7,12 +7,10 @@
 import random
 import hashlib
 
-VERSION = 0.2 # to help with compatibility
-
 # curve parameters
-b = 256
 q = 2**255 - 19
 l = 2**252 + 27742317777372353535851937790883648493
+cofactor = 8
 
 # Internal helper methods
 def exponent(b,e,m):
@@ -107,8 +105,8 @@ class Scalar:
             return self.x >= y.x
         raise TypeError
 
-    def __str__(self):
-        return str(self.x)
+    def __repr__(self):
+        return '<Scalar> x:'+str(self.x)
 
     def __int__(self):
         return self.x
@@ -180,8 +178,8 @@ class Point:
             return NotImplemented
         return self*y
 
-    def __str__(self):
-        return str(self.x) + str(self.y)
+    def __repr__(self):
+        return '<Point> x:'+str(self.x)+'|y:'+str(self.y)
 
     # determines if the point is on the curve
     def on_curve(self):
@@ -240,6 +238,9 @@ class PointVector:
             if not isinstance(item,Point):
                 raise TypeError
             self.points.append(item)
+
+    def __repr__(self):
+        return repr(self.points)
 
 class ScalarVector:
     def __init__(self,scalars):
@@ -309,6 +310,9 @@ class ScalarVector:
                 raise TypeError
             self.scalars.append(item)
 
+    def __repr__(self):
+        return repr(self.scalars)
+
     # return a vector of inverses
     def invert(self):
         inputs = self.scalars[:]
@@ -349,7 +353,7 @@ def hash_to_point(*data):
     while True:
         result = hashlib.sha256(result).hexdigest()
         if make_point(int(result,16)) is not None:
-            return make_point(int(result,16))*Scalar(8)
+            return make_point(int(result,16))*Scalar(cofactor)
 
 # hash data to get a scalar
 def hash_to_scalar(*data):
@@ -358,12 +362,12 @@ def hash_to_scalar(*data):
         if datum is None:
             raise TypeError
         result += hashlib.sha256(str(datum)).hexdigest()
-    
+
     # ensure we're uniformly in the scalar range
     while True:
+        result = hashlib.sha256(result).hexdigest()
         if int(result,16) < l:
             return Scalar(int(result,16))
-        result = hashlib.sha256(result).hexdigest()
 
 # generate a random scalar
 def random_scalar(zero=True):
