@@ -9,7 +9,7 @@ from scipy.stats import chisquare,variation
 
 N = 11 # ring size
 L = 100 # ledger size
-TRIALS = 100000 # tests to run
+TRIALS = 10000 # tests to run
 
 # Produce the output of a keyed hash function
 # IN: key k (arbitrary), index i (arbitrary)
