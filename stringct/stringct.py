@@ -7,9 +7,6 @@
 from dumb25519 import *
 import multisig
 
-if not VERSION == 0.2:
-    raise Exception('Library version mismatch!')
-
 H = hash_to_point('stringct H')
 
 class SecretKey:
