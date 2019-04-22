@@ -1,10 +1,5 @@
-import dumb25519
+from common import *
 from dumb25519 import hash_to_point, random_scalar, Scalar, hash_to_scalar
-
-G = dumb25519.G
-H = hash_to_point('H')
-H1 = hash_to_point('H1')
-H2 = hash_to_point('H2')
 
 # Proof structure
 class Proof:

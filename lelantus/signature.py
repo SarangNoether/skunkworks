@@ -1,7 +1,7 @@
 # Schnorr signature
 
-import dumb25519
-from dumb25519 import Scalar, Point, random_scalar, hash_to_scalar, G, Z
+from common import *
+from dumb25519 import Scalar, Point, random_scalar, hash_to_scalar, Z
 
 # Schnorr signature
 class Signature:

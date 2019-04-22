@@ -1,4 +1,4 @@
-import dumb25519
+from common import *
 from dumb25519 import Scalar, Point, ScalarVector, PointVector, random_scalar, random_point, hash_to_scalar, hash_to_point
 
 cache = '' # rolling transcript hash
@@ -106,7 +106,7 @@ def inner_product(data):
     return [G,H,U,a,b,L,R]
 
 # Generate a multi-output proof
-# data: [Scalar,Scalar,Scalar] pairs; amount value and masks
+# data: [s,v,r] commitment data; [Scalar,Scalar,Scalar] triplets
 # N: number of bits in range
 #
 # returns: list of proof data
@@ -115,17 +115,15 @@ def prove(data,N):
     M = len(data)
 
     # curve points
-    G1 = hash_to_point('H1') # this is to match other protocols
-    G2 = hash_to_point('H2') # this is to match other protocols
-    H = hash_to_point('G') # this is to match other protocols
     Gi = PointVector([hash_to_point('Gi ' + str(i)) for i in range(M*N)])
     Hi = PointVector([hash_to_point('Hi ' + str(i)) for i in range(M*N)])
 
     # set amount commitments
+    # [s,v,r] -> s*G + v*H1 + r*H2
     V = PointVector([])
     aL = ScalarVector([])
-    for v,gamma1,gamma2 in data:
-        V.append((H*v + G1*gamma1 + G2*gamma2)*inv8)
+    for s,v,r in data: # s,v,r
+        V.append((G*s + H1*v + H2*r)*inv8)
         mash(V[-1])
         aL.extend(scalar_to_bits(v,N))
 
@@ -135,12 +133,12 @@ def prove(data,N):
         aR.append(bit-Scalar(1))
 
     alpha = random_scalar()
-    A = (Gi*aL + Hi*aR + G1*alpha)*inv8
+    A = (Gi*aL + Hi*aR + G*alpha)*inv8
 
     sL = ScalarVector([random_scalar()]*(M*N))
     sR = ScalarVector([random_scalar()]*(M*N))
     rho = random_scalar()
-    S = (Gi*sL + Hi*sR + G1*rho)*inv8
+    S = (Gi*sL + Hi*sR + G*rho)*inv8
 
     # get challenges
     mash(A)
@@ -179,8 +177,8 @@ def prove(data,N):
     tau21 = random_scalar()
     tau12 = random_scalar()
     tau22 = random_scalar()
-    T1 = (H*t1 + G1*tau11 + G2*tau21)*inv8
-    T2 = (H*t2 + G1*tau12 + G2*tau22)*inv8
+    T1 = (H1*t1 + G*tau11 + H2*tau21)*inv8
+    T2 = (H1*t2 + G*tau12 + H2*tau22)*inv8
 
     mash(T1)
     mash(T2)
@@ -189,10 +187,10 @@ def prove(data,N):
     taux1 = tau12*(x**2) + tau11*x
     taux2 = tau22*(x**2) + tau21*x
     for j in range(1,M+1):
-        gamma1 = data[j-1][1]
-        gamma2 = data[j-1][2]
-        taux1 += z**(1+j)*gamma1
-        taux2 += z**(1+j)*gamma2
+        s = data[j-1][0]
+        r = data[j-1][2]
+        taux1 += z**(1+j)*s
+        taux2 += z**(1+j)*r
     mu = x*rho+alpha
     
     l = l0 + l1*x
@@ -209,7 +207,7 @@ def prove(data,N):
     R = PointVector([])
    
     # initial inner product inputs
-    data_ip = [Gi,PointVector([Hi[i]*(y_inv**i) for i in range(len(Hi))]),H*x_ip,l,r,None,None]
+    data_ip = [Gi,PointVector([Hi[i]*(y_inv**i) for i in range(len(Hi))]),H1*x_ip,l,r,None,None]
     while True:
         data_ip = inner_product(data_ip)
 
@@ -246,10 +244,6 @@ def verify(proofs,N):
     max_MN = 2**max([len(proof.L) for proof in proofs])
 
     # curve points
-    Z = dumb25519.Z
-    G1 = hash_to_point('H1')
-    G2 = hash_to_point('H2')
-    H = hash_to_point('G')
     Gi = PointVector([hash_to_point('Gi ' + str(i)) for i in range(max_MN)])
     Hi = PointVector([hash_to_point('Hi ' + str(i)) for i in range(max_MN)])
 
@@ -381,18 +375,18 @@ def verify(proofs,N):
     
     # now check all proofs together
     scalars.append(-y01-z1)
-    points.append(G1)
+    points.append(G)
     scalars.append(-y02)
-    points.append(G2)
+    points.append(H2)
     scalars.append(-y1+z3)
-    points.append(H)
+    points.append(H1)
     for i in range(max_MN):
         scalars.append(-z4[i])
         points.append(Gi[i])
         scalars.append(-z5[i])
         points.append(Hi[i])
 
-    if not dumb25519.multiexp(scalars,points) == Z:
+    if not dumb25519.multiexp(scalars,points) == dumb25519.Z:
         raise ArithmeticError('Bad z check!')
 
     return True

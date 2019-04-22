@@ -1,6 +1,6 @@
 # Test suite for Lelantus
 
-import dumb25519
+from common import *
 from dumb25519 import Z, G, Point, Scalar, PointVector, ScalarVector, random_point, random_scalar, hash_to_scalar, hash_to_point
 import pybullet
 import schnorr
@@ -41,55 +41,54 @@ class TestBullet(unittest.TestCase):
     def test_prove_verify_m_1_n_4(self):
         M = 1
         N = 4
-        data = [[Scalar(random.randint(0,2**N-1)),random_scalar(),random_scalar()] for i in range(M)]
+        data = [[random_scalar(),Scalar(random.randint(0,2**N-1)),random_scalar()] for i in range(M)]
         pybullet.verify([pybullet.prove(data,N)],N)
 
     def test_prove_verify_m_2_n_4(self):
         M = 2
         N = 4
-        data = [[Scalar(random.randint(0,2**N-1)),random_scalar(),random_scalar()] for i in range(M)]
+        data = [[random_scalar(),Scalar(random.randint(0,2**N-1)),random_scalar()] for i in range(M)]
         pybullet.verify([pybullet.prove(data,N)],N)
 
     def test_invalid_value(self):
         M = 1
         N = 4
-        data = [[Scalar(random.randint(2**N,2**(N+1)-1)),random_scalar(),random_scalar()]]
+        data = [[random_scalar(),Scalar(random.randint(2**N,2**(N+1)-1)),random_scalar()]]
         with self.assertRaises(ArithmeticError):
             pybullet.verify([pybullet.prove(data,N)],N)
 
     def test_batch_2_m_1_n_4(self):
         M = 1
         N = 4
-        data = [[Scalar(random.randint(0,2**N-1)),random_scalar(),random_scalar()] for i in range(M)]
+        data = [[random_scalar(),Scalar(random.randint(0,2**N-1)),random_scalar()] for i in range(M)]
         proof1 = pybullet.prove(data,N)
-        data = [[Scalar(random.randint(0,2**N-1)),random_scalar(),random_scalar()] for i in range(M)]
+        data = [[random_scalar(),Scalar(random.randint(0,2**N-1)),random_scalar()] for i in range(M)]
         proof2 = pybullet.prove(data,N)
         pybullet.verify([proof1,proof2],N)
 
     def test_batch_2_m_1_2_n_4(self):
         M = 1
         N = 4
-        data = [[Scalar(random.randint(0,2**N-1)),random_scalar(),random_scalar()] for i in range(M)]
+        data = [[random_scalar(),Scalar(random.randint(0,2**N-1)),random_scalar()] for i in range(M)]
         proof1 = pybullet.prove(data,N)
         M = 2
-        data = [[Scalar(random.randint(0,2**N-1)),random_scalar(),random_scalar()] for i in range(M)]
+        data = [[random_scalar(),Scalar(random.randint(0,2**N-1)),random_scalar()] for i in range(M)]
         proof2 = pybullet.prove(data,N)
         pybullet.verify([proof1,proof2],N)
 
     def test_invalid_batch_2_m_1_2_n_4(self):
         M = 1
         N = 4
-        data = [[Scalar(random.randint(0,2**N-1)),random_scalar(),random_scalar()] for i in range(M)]
+        data = [[random_scalar(),Scalar(random.randint(0,2**N-1)),random_scalar()] for i in range(M)]
         proof1 = pybullet.prove(data,N)
         M = 2
-        data = [[Scalar(random.randint(2**N,2**(N+1)-1)),random_scalar(),random_scalar()] for i in range(M)]
+        data = [[random_scalar(),Scalar(random.randint(2**N,2**(N+1)-1)),random_scalar()] for i in range(M)]
         proof2 = pybullet.prove(data,N)
         with self.assertRaises(ArithmeticError):
             pybullet.verify([proof1,proof2],N)
 
 class TestSchnorr(unittest.TestCase):
     def test_random(self):
-        H = hash_to_point('schnorr H')
         schnorr.verify(schnorr.prove(random_scalar(),random_scalar(),G,H))
 
 class TestGroth(unittest.TestCase):
