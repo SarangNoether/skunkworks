@@ -77,11 +77,6 @@ class SpendTransaction:
     #   f: fee
     #   P: destination addresses (list)
     def __init__(self,C_list,n,m,q,l,v_in,r_in,v_out,f,P):
-        # NOTE: This only supports spending a single input
-        # This is because of aggregate Fiat-Shamir limitations in the Groth proving system
-        if not len(q) == 1:
-            raise ValueError('Only single spends are supported!')
-
         # Confirm balance
         balance = Scalar(0)
         for i in v_in:
@@ -92,22 +87,29 @@ class SpendTransaction:
         if not balance == Scalar(0):
             raise ArithmeticError('Spend transaction does not balance!')
         
-        # Generate spend proofs and signatures
+        # Generate spend proofs
         spend_gammas = []
+        spend_states = []
         for i in range(len(q)):
-            # Spend proof
             self.Q.append(G*q[i])
-            s = hash_to_scalar(self.Q[-1])
-            if not C_list[l[i]] == groth.comm(s,v_in[i],r_in[i]):
-                raise ValueError('Coin commitment does not match private data!')
-            offset = groth.comm(s,Scalar(0),Scalar(0))
+            offset = groth.comm(hash_to_scalar(self.Q[-1]),Scalar(0),Scalar(0))
             M = [C-offset for C in C_list] # one is a commitment to zero
-            spend_proof,gammas = groth.prove(M,l[i],v_in[i],r_in[i],n,m)
+
+            spend_proof,spend_state = groth.prove_initial(M,l[i],v_in[i],r_in[i],n,m)
             self.spend_proofs.append(spend_proof)
-            spend_gammas.append(gammas)
+            spend_states.append(spend_state)
+
+        # Compute aggregate Fiat-Shamir challenge
+        x = groth.challenge(self.spend_proofs)
+
+        # Complete spend proofs
+        for i in range(len(q)):
+            spend_states[i].x = x
+            self.spend_proofs[i],spend_gamma = groth.prove_final(self.spend_proofs[i],spend_states[i])
+            spend_gammas.append(spend_gamma)
 
             # Spend proof signature
-            self.spend_sigs.append(signature.sign(repr(spend_proof),q[i]))
+            self.spend_sigs.append(signature.sign(repr(self.spend_proofs[i]),q[i]))
 
         # Store input anonymity set and fee
         self.C_list = C_list
@@ -133,19 +135,18 @@ class SpendTransaction:
         self.range_proof = pybullet.prove(range_proof_data,BITS)
 
         # Balance proof
-        spend_proof = self.spend_proofs[0]
-        spend_x = hash_to_scalar(spend_proof.A,spend_proof.B,spend_proof.C,spend_proof.D,spend_proof.G,spend_proof.Q)
         balance_x = Scalar(0)
         balance_y = Scalar(0)
         for i in range(len(v_out)):
             balance_x += range_proof_data[i][0]
             balance_y += range_proof_data[i][2]
-        balance_x *= spend_x**m
-        balance_y *= spend_x**m
-        balance_y -= r_in[0]*spend_x**m
+        balance_x *= x**m
+        balance_y *= x**m
+        for i in range(len(v_in)):
+            balance_y -= r_in[i]*x**m
+            for j in range(m):
+                balance_y -= spend_gammas[i][j]*x**j
 
-        for j in range(m):
-            balance_y -= spend_gammas[0][j]*spend_x**j
         balance_proof = schnorr.prove(balance_x,balance_y,G,H2)
 
         self.balance_proof = balance_proof
@@ -157,26 +158,31 @@ class SpendTransaction:
             signature.verify(repr(self.spend_proofs[i]),self.Q[i],self.spend_sigs[i])
 
         # Verify the spend proofs
+        x = groth.challenge(self.spend_proofs)
         for i in range(len(self.spend_proofs)):
             s = hash_to_scalar(self.Q[i])
             offset = groth.comm(s,Scalar(0),Scalar(0))
             M = [C-offset for C in self.C_list]
-            groth.verify(M,self.spend_proofs[i],n,m)
+            groth.verify(M,self.spend_proofs[i],n,m,x)
 
         # Verify the aggregate range proof
         pybullet.verify([self.range_proof],BITS)
 
         # Verify the balance proof
-        spend_proof = self.spend_proofs[0]
-        spend_x = hash_to_scalar(spend_proof.A,spend_proof.B,spend_proof.C,spend_proof.D,spend_proof.G,spend_proof.Q)
-
         A = H1*self.f
         for i in range(len(self.C)):
             A += self.C[i]
-        A *= spend_x**self.m
-        B = groth.comm(Scalar(0),self.spend_proofs[0].zV,self.spend_proofs[0].zR)
-        for j in range(m):
-            B += self.spend_proofs[0].Q[j]*spend_x**j
+        A *= x**self.m
+        
+        temp_V = Scalar(0)
+        temp_R = Scalar(0)
+        temp_Q = Z
+        for i in range(len(self.Q)):
+            temp_V += self.spend_proofs[i].zV
+            temp_R += self.spend_proofs[i].zR
+            for j in range(m):
+                temp_Q += self.spend_proofs[i].Q[j]*x**j
+        B = groth.comm(Scalar(0),temp_V,temp_R) + temp_Q
 
         if not self.balance_proof.Y == A-B or not self.balance_proof.W == G or not self.balance_proof.X == H2:
             raise ArithmeticError('Bad balance proof!')

@@ -99,8 +99,10 @@ class TestGroth(unittest.TestCase):
         n = 1
         m = 1
         l = 0
-        proof,gammas = groth.prove(M,l,v,r,n,m)
-        groth.verify(M,proof,n,m)
+        proof,state = groth.prove_initial(M,l,v,r,n,m)
+        state.x = groth.challenge([proof])
+        proof,gammas = groth.prove_final(proof,state)
+        groth.verify(M,proof,n,m,state.x)
 
     def test_2_0(self):
         n = 2
@@ -111,8 +113,10 @@ class TestGroth(unittest.TestCase):
         r = [random_scalar()]*N
         M = [groth.comm(random_scalar(),v[i],r[i]) for i in range(N)]
         M[l] = groth.comm(Scalar(0),v[l],r[l])
-        proof,gammas = groth.prove(M,l,v[l],r[l],n,m)
-        groth.verify(M,proof,n,m)
+        proof,state = groth.prove_initial(M,l,v[l],r[l],n,m)
+        state.x = groth.challenge([proof])
+        proof,gammas = groth.prove_final(proof,state)
+        groth.verify(M,proof,n,m,state.x)
 
     def test_2_1(self):
         n = 2
@@ -123,8 +127,10 @@ class TestGroth(unittest.TestCase):
         r = [random_scalar()]*N
         M = [groth.comm(random_scalar(),v[i],r[i]) for i in range(N)]
         M[l] = groth.comm(Scalar(0),v[l],r[l])
-        proof,gammas = groth.prove(M,l,v[l],r[l],n,m)
-        groth.verify(M,proof,n,m)
+        proof,state = groth.prove_initial(M,l,v[l],r[l],n,m)
+        state.x = groth.challenge([proof])
+        proof,gammas = groth.prove_final(proof,state)
+        groth.verify(M,proof,n,m,state.x)
 
     def test_8_all(self):
         n = 2
@@ -135,8 +141,10 @@ class TestGroth(unittest.TestCase):
         for l in range(N):
             M = [groth.comm(random_scalar(),v[i],r[i]) for i in range(N)]
             M[l] = groth.comm(Scalar(0),v[l],r[l])
-            proof,gammas = groth.prove(M,l,v[l],r[l],n,m)
-            groth.verify(M,proof,n,m)
+            proof,state = groth.prove_initial(M,l,v[l],r[l],n,m)
+            state.x = groth.challenge([proof])
+            proof,gammas = groth.prove_final(proof,state)
+            groth.verify(M,proof,n,m,state.x)
 
 class TestSignature(unittest.TestCase):
     def test_random_key(self):
@@ -162,5 +170,6 @@ class TestSignature(unittest.TestCase):
         with self.assertRaises(ValueError):
             signature.sign(m,x)
         
-for test in [TestBulletOps,TestBullet,TestSchnorr,TestGroth,TestSignature]:
+#for test in [TestBulletOps,TestBullet,TestSchnorr,TestGroth,TestSignature]:
+for test in [TestGroth]:
     unittest.TextTestRunner(verbosity=2,failfast=True).run(unittest.TestLoader().loadTestsFromTestCase(test))

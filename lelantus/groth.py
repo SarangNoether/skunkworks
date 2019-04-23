@@ -1,6 +1,24 @@
 from common import *
 from dumb25519 import hash_to_point, random_scalar, Scalar, hash_to_scalar
 
+# Internal proof state
+class State:
+    m = None
+    n = None
+    sigma = None
+    a = None
+    rA = None
+    rB = None
+    rC = None
+    rD = None
+    v = None
+    r = None
+    rho = None
+    tau = None
+    gammas = None
+
+    x = None # Fiat-Shamir challenge
+
 # Proof structure
 class Proof:
     A = None
@@ -29,6 +47,16 @@ class Proof:
         temp += 'zV:'+repr(self.zV)+'|'
         temp += 'zR:'+repr(self.zR)
         return temp
+
+# Compute an aggregate Fiat-Shamir challenge
+def challenge(proofs):
+    A = [proof.A for proof in proofs]
+    B = [proof.B for proof in proofs]
+    C = [proof.C for proof in proofs]
+    D = [proof.D for proof in proofs]
+    G = [proof.G for proof in proofs]
+    Q = [proof.Q for proof in proofs]
+    return hash_to_scalar(A,B,C,D,G,Q)
 
 # Double-blinded Pedersen matrix commitment
 def com_matrix(v,r):
@@ -102,8 +130,8 @@ def convolve(x,y,size=None):
 #  n,m: dimensions such that len(M) == n**m
 # RETURNS
 #  proof structure
-#  gammas: list of gamma values (not part of public proof; needed to prove balance later))
-def prove(M,l,v,r,n,m):
+#  internal state
+def prove_initial(M,l,v,r,n,m):
     # Size check
     if not len(M) == n**m:
         return IndexError('Bad size decomposition!')
@@ -173,8 +201,51 @@ def prove(M,l,v,r,n,m):
         G[j] -= H2*gamma
         Q[j] = comm(Scalar(0),rho[j],tau[j]) + H2*gamma
 
-    # Fiat-Shamir challenge
-    x = hash_to_scalar(A,B,C,D,G,Q)
+    # Assemble state
+    state = State()
+    state.m = m
+    state.n = n
+    state.sigma = sigma
+    state.a = a
+    state.rA = rA
+    state.rB = rB
+    state.rC = rC
+    state.rD = rD
+    state.v = v
+    state.r = r
+    state.rho = rho
+    state.tau = tau
+    state.gammas = gammas
+
+    # Partial proof
+    proof = Proof()
+    proof.A = A
+    proof.B = B
+    proof.C = C
+    proof.D = D
+    proof.G = G
+    proof.Q = Q
+
+    return proof,state
+
+# Complete a partial proof
+def prove_final(proof,state):
+    x = state.x # aggregate Fiat-Shamir challenge
+
+    # Recover state
+    m = state.m
+    n = state.n
+    sigma = state.sigma
+    a = state.a
+    rA = state.rA
+    rB = state.rB
+    rC = state.rC
+    rD = state.rD
+    v = state.v
+    r = state.r
+    rho = state.rho
+    tau = state.tau
+    gammas = state.gammas
 
     f = [[None]*n for _ in range(m)]
     for j in range(m):
@@ -190,13 +261,6 @@ def prove(M,l,v,r,n,m):
         zR -= tau[j]*x**j
 
     # Assemble proof
-    proof = Proof()
-    proof.A = A
-    proof.B = B
-    proof.C = C
-    proof.D = D
-    proof.G = G
-    proof.Q = Q
     proof.f = f
     proof.zA = zA
     proof.zC = zC
@@ -211,9 +275,10 @@ def prove(M,l,v,r,n,m):
 #  M: list of double-blinded Pedersen commitments such that len(M) == n**m
 #  proof: proof structure
 #  n,m: dimensions such that len(M) == n**m
+#  x: aggregate Fiat-Shamir challenge
 # RETURNS
 #  True if the proof is valid
-def verify(M,proof,n,m):
+def verify(M,proof,n,m,x):
     A = proof.A
     B = proof.B
     C = proof.C
@@ -227,9 +292,6 @@ def verify(M,proof,n,m):
     zR = proof.zR
 
     N = n**m
-
-    # Fiat-Shamir challenge
-    x = hash_to_scalar(A,B,C,D,G,Q)
 
     for j in range(m):
         f[j][0] = x
