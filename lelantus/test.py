@@ -170,6 +170,5 @@ class TestSignature(unittest.TestCase):
         with self.assertRaises(ValueError):
             signature.sign(m,x)
         
-#for test in [TestBulletOps,TestBullet,TestSchnorr,TestGroth,TestSignature]:
-for test in [TestGroth]:
+for test in [TestBulletOps,TestBullet,TestSchnorr,TestGroth,TestSignature]:
     unittest.TextTestRunner(verbosity=2,failfast=True).run(unittest.TestLoader().loadTestsFromTestCase(test))

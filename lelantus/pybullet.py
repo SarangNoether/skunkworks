@@ -6,19 +6,20 @@ inv8 = Scalar(8).invert()
 
 # Proof structure
 class Bulletproof:
-    V = None
-    A = None
-    S = None
-    T1 = None
-    T2 = None
-    taux1 = None
-    taux2 = None
-    mu = None
-    L = None
-    R = None
-    a = None
-    b = None
-    t = None
+    def __init__(self):
+        self.V = None
+        self.A = None
+        self.S = None
+        self.T1 = None
+        self.T2 = None
+        self.taux1 = None
+        self.taux2 = None
+        self.mu = None
+        self.L = None
+        self.R = None
+        self.a = None
+        self.b = None
+        self.t = None
 
 # Add to a transcript hash
 def mash(s):

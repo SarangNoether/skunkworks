@@ -7,12 +7,13 @@ from dumb25519 import Scalar, Point, random_scalar, hash_to_scalar
 
 # Schnorr proof
 class Proof:
-    W = None
-    X = None
-    Y = None
-    U = None
-    s1 = None
-    t1 = None
+    def __init__(self):
+        self.W = None
+        self.X = None
+        self.Y = None
+        self.U = None
+        self.s1 = None
+        self.t1 = None
 
 # Perform a generalized Schnorr proof
 def prove(s,t,W,X):

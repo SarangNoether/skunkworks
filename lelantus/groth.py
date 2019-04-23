@@ -3,35 +3,37 @@ from dumb25519 import hash_to_point, random_scalar, Scalar, hash_to_scalar
 
 # Internal proof state
 class State:
-    m = None
-    n = None
-    sigma = None
-    a = None
-    rA = None
-    rB = None
-    rC = None
-    rD = None
-    v = None
-    r = None
-    rho = None
-    tau = None
-    gammas = None
+    def __init__(self):
+        self.m = None
+        self.n = None
+        self.sigma = None
+        self.a = None
+        self.rA = None
+        self.rB = None
+        self.rC = None
+        self.rD = None
+        self.v = None
+        self.r = None
+        self.rho = None
+        self.tau = None
+        self.gammas = None
 
-    x = None # Fiat-Shamir challenge
+        self.x = None # Fiat-Shamir challenge
 
 # Proof structure
 class Proof:
-    A = None
-    B = None
-    C = None
-    D = None
-    G = None
-    Q = None
-    f = None
-    zA = None
-    zC = None
-    zV = None
-    zR = None
+    def __init__(self):
+        self.A = None
+        self.B = None
+        self.C = None
+        self.D = None
+        self.G = None
+        self.Q = None
+        self.f = None
+        self.zA = None
+        self.zC = None
+        self.zV = None
+        self.zR = None
 
     def __repr__(self):
         temp = '<GrothProof> '

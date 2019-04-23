@@ -5,8 +5,9 @@ from dumb25519 import Scalar, Point, random_scalar, hash_to_scalar, Z
 
 # Schnorr signature
 class Signature:
-    s = None
-    e = None
+    def __init__(self):
+        self.s = None
+        self.e = None
 
 # Generate a Schnorr signature
 def sign(m,x):

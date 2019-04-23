@@ -7,8 +7,9 @@ from dumb25519 import Scalar, Point, random_scalar, hash_to_scalar
 
 # Encryption
 class Ciphertext:
-    K = None
-    M = None
+    def __init__(self):
+        self.K = None
+        self.M = None
 
 # Encrypt a message
 #

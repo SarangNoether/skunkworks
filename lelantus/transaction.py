@@ -11,14 +11,6 @@ import random
 
 # The result of a mint operation
 class MintTransaction:
-    # Public values
-    Y = None # coin public key
-    C = None # coin commitment
-    v = None # coin value
-    proof = None # Schnorr proof
-    enc_r = None # encrypted coin blinder
-    enc_y = None # encrypted partial Diffie-Hellman secret
-
     # Mint the coin
     #
     # INPUTS
@@ -33,8 +25,8 @@ class MintTransaction:
 
         self.Y = G*y
         self.C = C
-        self.proof = proof
         self.v = v
+        self.proof = proof
         self.enc_r = elgamal.encrypt(r,P)
         self.enc_y = elgamal.encrypt(y,P)
         self.P = P
@@ -49,21 +41,6 @@ class MintTransaction:
 
 # The result of a spend operation
 class SpendTransaction:
-    # Public values
-    C_list = None # anonymity set
-    n = None
-    m = None
-    Q = [] # input coin public keys
-    spend_proofs = [] # spend proofs
-    spend_sigs = [] # spend proof signatures
-    C = [] # output coin commitments
-    f = None # fee
-    range_proof = None # aggregated range proof
-    balance_proof = None # balance proof
-    enc_r = [] # encrypted coin blinders
-    enc_v = [] # encrypted coin values
-    enc_y = [] # encrypted partial Diffie-Hellman secrets
-
     # Initiate the spend operation
     #
     # INPUTS
@@ -90,6 +67,8 @@ class SpendTransaction:
         # Generate spend proofs
         spend_gammas = []
         spend_states = []
+        self.Q = [] # input coin public keys
+        self.spend_proofs = []
         for i in range(len(q)):
             self.Q.append(G*q[i])
             offset = groth.comm(hash_to_scalar(self.Q[-1]),Scalar(0),Scalar(0))
@@ -103,6 +82,7 @@ class SpendTransaction:
         x = groth.challenge(self.spend_proofs)
 
         # Complete spend proofs
+        self.spend_sigs = []
         for i in range(len(q)):
             spend_states[i].x = x
             self.spend_proofs[i],spend_gamma = groth.prove_final(self.spend_proofs[i],spend_states[i])
@@ -118,6 +98,10 @@ class SpendTransaction:
         self.m = m
 
         # Generate outputs
+        self.C = [] # output coin commitments
+        self.enc_r = [] # encrypted coin blinders
+        self.enc_v = [] # encrypted coin values
+        self.enc_y = [] # encrypted partial Diffie-Hellman secrets
         range_proof_data = [] # for aggregate range proof
         for i in range(len(v_out)):
             y = random_scalar()
@@ -127,9 +111,9 @@ class SpendTransaction:
             range_proof_data.append([s,v_out[i],r_out])
 
             # Encrypt data for recipients
-            self.enc_r = elgamal.encrypt(r_out,P[i])
-            self.enc_v = elgamal.encrypt(v_out[i],P[i])
-            self.enc_y = elgamal.encrypt(y,P[i])
+            self.enc_r.append(elgamal.encrypt(r_out,P[i]))
+            self.enc_v.append(elgamal.encrypt(v_out[i],P[i]))
+            self.enc_y.append(elgamal.encrypt(y,P[i]))
 
         # Aggregate range proof
         self.range_proof = pybullet.prove(range_proof_data,BITS)
@@ -214,9 +198,20 @@ r = elgamal.decrypt(mint.enc_r,a)
 y = elgamal.decrypt(mint.enc_y,a)
 
 # Alice spends her coin to Bob with change to herself
-# Consume the coin and generate 2 new coins
-# Generate a spend proof and publicly verify
-print 'Generating spend proof...'
+print 'Spending to Bob with change...'
 spend = SpendTransaction(Coins,n,m,[a*y],[l],[mint.v],[r],[Scalar(1),Scalar(1)],Scalar(1),[B,A])
 print 'Verifying...'
 spend.verify()
+
+# Bob recovers the coin value, blinder, and private key to churn
+print 'Churning coin to Bob...'
+l = random.randrange(len(Coins)) # index for Bob's coin
+Coins[l] = spend.C[0]
+v = elgamal.decrypt(spend.enc_v[0],b)
+r = elgamal.decrypt(spend.enc_r[0],b)
+y = elgamal.decrypt(spend.enc_y[0],b)
+churn = SpendTransaction(Coins,n,m,[b*y],[l],[v],[r],[Scalar(1)],Scalar(0),[B])
+print 'Verifying...'
+churn.verify()
+
+print 'Done!'
