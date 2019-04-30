@@ -62,7 +62,7 @@ def sign(M,p,P):
     # Private index
     L = G*alpha
     R = H*alpha
-    h[(l+1) % n] = hash_to_scalar(M,L,R)
+    h[(l+1) % n] = hash_to_scalar(P,M,L,R)
    
     # Decoy indices
     if n > 1:
@@ -73,7 +73,7 @@ def sign(M,p,P):
             for j in range(m):
                 L += P[i][j]*(h[i]*mu[j])
                 R += I[j]*(h[i]*mu[j])
-            h[(i+1) % n] = hash_to_scalar(M,L,R)
+            h[(i+1) % n] = hash_to_scalar(P,M,L,R)
 
     # Final scalar computation
     s[l] = alpha
@@ -121,7 +121,7 @@ def verify(M,P,sig):
         for j in range(m):
             L += P[i%n][j]*(temp_h*mu[j])
             R += I[j]*(temp_h*mu[j])
-        h[(i+1)%n] = hash_to_scalar(M,L,R)
+        h[(i+1)%n] = hash_to_scalar(P,M,L,R)
 
     # Final check
     if not h[0] == h0:
