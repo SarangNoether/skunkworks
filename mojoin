@@ -52,3 +52,11 @@ A,B,C -> D: MLSAGs and Bulletproofs-C proofs
 
 D -> A,B,C: final transaction
     Dave completes the aggregation of the Bulletproofs into a single proof. He verifies the Bulletproof to confirm it contains valid proofs for all outputs. He verifies all MLSAG signatures. He verifies that the sum of all pseudo-output masks and output masks is zero. He returns the final transaction data to all players. Either Dave or any other player may broadcast the resulting transaction to the network.
+
+
+SECURITY AND RISK
+At the end of the protocol, each player receives the final transaction. A player knows its own signature and output data; however, if there are at least three non-colluding players, it will not know the mapping between inputs and outputs, nor can it use sums of subsets of commitments (pseudo-output and output) to determine this, since all commitment masks (except for one) are chosen uniformly at random or are computed using a Diffie-Hellman exchange known only to the player and the eventual recipient.
+
+An observer cannot distinguish a valid MoJoin transaction from a single-party transaction. All input MLSAG signatures are computed as normal, and the Bulletproofs multiparty computation protocol ensures that the range proof is verified precisely as in the single-party aggregated case.
+
+The dealer explicitly learns which input rings and outputs belong to each player. Since each player (except one) sends the sum of its pseudo-output and output masks, and each of these masks is computed either uniformly at random or as the output of the hash of a shared secret not known to the dealer, the dealer gains no advantage in attempting to brute-force either the value or mask of any commitment. Since the Bulletproofs multiparty computation is witness-indistinguishable, the dealer cannot use partial proofs to obtain commitment information either.
