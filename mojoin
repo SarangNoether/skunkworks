@@ -24,7 +24,7 @@ D -> A,B,C: output indices
 
 ROUND 1: COMMITMENTS AND BULLETPROOFS-A
 A,B,C -> D: output commitments, public keys, auxiliary data, and Bulletproofs-A proofs
-    Each player uses the output indices from ROUND 0, along with random masks, to generate a commitment for each output. They also generate one-time output public keys, the associated transaction keys, and the associated encrypted amounts. They also generate stage-A Bulletproof partial proofs for all outputs. They send this data to Dave.
+    Each player uses the output indices from ROUND 0 to generate a commitment for each output. They also generate one-time output public keys, the associated transaction keys, and the associated encrypted amounts. Separate transaction keys are used for each output, regardless of whether destination addresses are standard addresses or subaddresses. They also generate stage-A Bulletproof partial proofs for all outputs. They send this data to Dave.
 
 D -> A,B,C: Bulletproofs A/B challenge
     Dave computes the Bulletproofs A/B challenge and returns it to each player.
