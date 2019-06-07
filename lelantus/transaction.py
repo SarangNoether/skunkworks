@@ -29,7 +29,6 @@ class MintTransaction:
         self.proof = proof
         self.enc_r = elgamal.encrypt(r,P)
         self.enc_y = elgamal.encrypt(y,P)
-        self.P = P
 
     # Verify the mint
     def verify(self):
