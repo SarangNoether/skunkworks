@@ -8,6 +8,71 @@ import schnorr
 import elgamal
 import signature
 import random
+import clsag
+
+# The result of a migration operation
+class MigrationTransaction:
+    # Migrate an existing coin
+    #
+    # INPUTS
+    #   P_in: public key anonymity set (list)
+    #   C_in: commitment anonymity set (list)
+    #   l: private key index
+    #   p: private key
+    #   v: commitment value
+    #   a: commitment mask
+    #   P: destination address
+    def __init__(self,P_in,C_in,l,p,v,a,P):
+        y = random_scalar()
+        s = hash_to_scalar(P*y) # coin serial number
+
+        # Ensure commitment data is valid
+        if not com(v,a) == C_in[l]:
+            raise ArithmeticError('Bad known commitment!')
+
+        # Offset commitments using intermediate commitment
+        b = random_scalar()
+        C1 = com(v,b)
+        for i in range(len(C_in)):
+            C_in[i] -= C1
+
+        # Generate CLSAG signature
+        sig = clsag.sign('test',p,P_in,a-b,C_in)
+
+        # Generate Lelantus commitment
+        r = random_scalar()
+        D = groth.comm(s,v,r)
+
+        # Prove value balance
+        proof = schnorr.prove(r-b,s,H2,G)
+
+        # Encrypt recipient data
+        enc_r = elgamal.encrypt(r,P)
+        enc_v = elgamal.encrypt(v,P)
+        enc_y = elgamal.encrypt(y,P)
+        
+        self.P_in = P_in
+        self.C_in = C_in
+        self.Y = G*y
+        self.C1 = C1
+        self.sig = sig
+        self.D = D
+        self.proof = proof
+        self.enc_r = enc_r
+        self.enc_v = enc_v
+        self.enc_y = enc_y
+
+    # Verify the migration
+    def verify(self):
+        # Verify CLSAG signature
+        clsag.verify('test',self.P_in,self.C_in,self.sig)
+
+        # Verify balance
+        if not self.proof.W == H2 or not self.proof.X == G:
+            raise ValueError('Migration proof contains bad generators!')
+        if not self.proof.Y == self.D - self.C1:
+            raise ValueError('Migration proof contains bad point!')
+        schnorr.verify(self.proof)
 
 # The result of a mint operation
 class MintTransaction:
@@ -179,9 +244,27 @@ A = G*a
 b = random_scalar()
 B = G*b
 
+# Generate a coin (and decoys) for migration
+N = 11
+P_old = [random_point()]*N
+C_old = [random_point()]*N
+
+p = random_scalar() # private key
+r = random_scalar() # commitment mask
+v = Scalar(3) # coin value
+l = random.randrange(N)
+P_old[l] = H2*p
+C_old[l] = com(v,r)
+
+# Generate migration transaction to Alice and verify
+print 'Migrating coin to Alice...'
+migration = MigrationTransaction(P_old,C_old,l,p,v,r,A)
+print 'Verifying...'
+migration.verify()
+
 # Mint a new coin to Alice and publicly verify
 print 'Minting a new coin to Alice...'
-mint = MintTransaction(Scalar(3),A)
+mint = MintTransaction(Scalar(1),A)
 print 'Verifying...'
 mint.verify()
 
@@ -189,16 +272,20 @@ mint.verify()
 n = 2
 m = 3
 Coins = [random_point()]*(n**m)
-l = random.randrange(len(Coins)) # index of the real coin
-Coins[l] = mint.C # the real coin
+l = [0,0]
+while l[0] == l[1]:
+    l = [random.randrange(len(Coins)),random.randrange(len(Coins))] # index of the real coins
+Coins[l[0]] = migration.D # the real migrated coin
+Coins[l[1]] = mint.C # the real mint coin
 
-# Alice recovers the coin blinder and private key
-r = elgamal.decrypt(mint.enc_r,a)
-y = elgamal.decrypt(mint.enc_y,a)
+# Alice recovers the coin blinder and private key from the migration and mint
+r = [elgamal.decrypt(migration.enc_r,a),elgamal.decrypt(mint.enc_r,a)]
+y = [elgamal.decrypt(migration.enc_y,a),elgamal.decrypt(mint.enc_y,a)]
+v = [elgamal.decrypt(migration.enc_v,a),mint.v]
 
-# Alice spends her coin to Bob with change to herself
-print 'Spending to Bob with change...'
-spend = SpendTransaction(Coins,n,m,[a*y],[l],[mint.v],[r],[Scalar(1),Scalar(1)],Scalar(1),[B,A])
+# Alice spends her coins to Bob with change to herself
+print 'Spending coins to Bob with change...'
+spend = SpendTransaction(Coins,n,m,[a*y[i] for i in range(2)],l,v,r,[Scalar(2),Scalar(1)],Scalar(1),[B,A])
 print 'Verifying...'
 spend.verify()
 
@@ -209,7 +296,7 @@ Coins[l] = spend.C[0]
 v = elgamal.decrypt(spend.enc_v[0],b)
 r = elgamal.decrypt(spend.enc_r[0],b)
 y = elgamal.decrypt(spend.enc_y[0],b)
-churn = SpendTransaction(Coins,n,m,[b*y],[l],[v],[r],[Scalar(1)],Scalar(0),[B])
+churn = SpendTransaction(Coins,n,m,[b*y],[l],[v],[r],[Scalar(1)],Scalar(1),[B])
 print 'Verifying...'
 churn.verify()
 
