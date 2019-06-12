@@ -21,8 +21,9 @@ class MigrationTransaction:
     #   p: private key
     #   v: commitment value
     #   a: commitment mask
+    #   f: fee
     #   P: destination address
-    def __init__(self,P_in,C_in,l,p,v,a,P):
+    def __init__(self,P_in,C_in,l,p,v,a,f,P):
         y = random_scalar()
         s = hash_to_scalar(P*y) # coin serial number
 
@@ -41,14 +42,14 @@ class MigrationTransaction:
 
         # Generate Lelantus commitment
         r = random_scalar()
-        D = groth.comm(s,v,r)
+        D = groth.comm(s,v-f,r)
 
         # Prove value balance
         proof = schnorr.prove(r-b,s,H2,G)
 
         # Encrypt recipient data
         enc_r = elgamal.encrypt(r,P)
-        enc_v = elgamal.encrypt(v,P)
+        enc_v = elgamal.encrypt(v-f,P)
         enc_y = elgamal.encrypt(y,P)
         
         self.P_in = P_in
@@ -61,6 +62,7 @@ class MigrationTransaction:
         self.enc_r = enc_r
         self.enc_v = enc_v
         self.enc_y = enc_y
+        self.f = f
 
     # Verify the migration
     def verify(self):
@@ -70,7 +72,7 @@ class MigrationTransaction:
         # Verify balance
         if not self.proof.W == H2 or not self.proof.X == G:
             raise ValueError('Migration proof contains bad generators!')
-        if not self.proof.Y == self.D - self.C1:
+        if not self.proof.Y == self.D + H1*self.f - self.C1:
             raise ValueError('Migration proof contains bad point!')
         schnorr.verify(self.proof)
 
@@ -251,14 +253,15 @@ C_old = [random_point()]*N
 
 p = random_scalar() # private key
 r = random_scalar() # commitment mask
-v = Scalar(3) # coin value
+v = Scalar(4) # coin value
+f = Scalar(1) # fee
 l = random.randrange(N)
 P_old[l] = H2*p
 C_old[l] = com(v,r)
 
 # Generate migration transaction to Alice and verify
 print 'Migrating coin to Alice...'
-migration = MigrationTransaction(P_old,C_old,l,p,v,r,A)
+migration = MigrationTransaction(P_old,C_old,l,p,v,r,f,A)
 print 'Verifying...'
 migration.verify()
 
