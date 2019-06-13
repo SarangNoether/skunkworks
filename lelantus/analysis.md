@@ -46,7 +46,7 @@ Encrypted mask | `enc_r` | `2`
 Encrypted private key | `enc_y` | `2`
 **Total** | | **`N + 15 + O(1)`**
 
-For the current Monero protocol where `N = 11`, a migration transaction is 832 kB.
+For the current Monero protocol where `N = 11`, a migration transaction is 832 B.
 
 
 ### Mint transaction
@@ -65,7 +65,7 @@ Encrypted mask | `enc_r` | `2`
 Encrypted private key | `enc_y` | `2`
 **Total** | | **`10`**
 
-A mint transaction is 320 kB.
+A mint transaction is 320 B.
 
 
 ### Spend transaction
