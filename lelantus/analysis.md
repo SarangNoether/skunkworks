@@ -13,8 +13,8 @@ Important assumptions and notes:
 
 ## Transaction types
 
-There are three Lelantus transaction types.
-- A [_migration_ transaction](https://github.com/SarangNoether/skunkworks/blob/lelantus/lelantus/migration.md) consumes a Monero output and generates a new Lelantus output.
+There are three Lelantus [transaction types](https://github.com/SarangNoether/skunkworks/blob/lelantus/lelantus/transaction.py).
+- A _migration_ transaction consumes a Monero output and generates a new Lelantus output.
 - A _mint_ transaction generates new Lelantus outputs without consuming any existing outputs.
 - A _spend_ transaction consumes Lelantus outputs and generates new Lelantus outputs.
 
