@@ -39,7 +39,7 @@ def sign(m,x):
 
     # Construct signature
     sig = Signature()
-    sig.c = hash_to_scalar(m, alpha*G)
+    sig.c = hash_to_scalar(m, x*G, alpha*G)
     sig.s = alpha - x*sig.c
     return sig
 
@@ -66,7 +66,7 @@ def verify(m,X,sig):
         raise TypeError('Signature components must be Scalars!')
 
     # Verify the signature
-    c = hash_to_scalar(m, sig.s*G + sig.c*X)
+    c = hash_to_scalar(m, X, sig.s*G + sig.c*X)
     return c == sig.c
 
 # Run simple tests
