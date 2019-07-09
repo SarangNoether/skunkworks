@@ -136,12 +136,12 @@ def convolve(x,y,size=None):
 def prove_initial(M,l,v,r,n,m):
     # Size check
     if not len(M) == n**m:
-        return IndexError('Bad size decomposition!')
+        raise IndexError('Bad size decomposition!')
     N = len(M)
 
     # Reconstruct the known commitment
     if not comm(Scalar(0),v,r) == M[l]:
-        return ValueError('Bad known commitment!')
+        raise ValueError('Bad known commitment!')
 
     rA = random_scalar()
     rB = random_scalar()
