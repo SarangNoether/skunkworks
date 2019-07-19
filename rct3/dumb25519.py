@@ -299,6 +299,9 @@ class ScalarVector:
             return self.scalars[i]
         return ScalarVector(self.scalars[i])
 
+    def __setitem__(self,key,value):
+        self.scalars[key] = value
+
     def append(self,item):
         if not isinstance(item,Scalar):
             raise TypeError
@@ -390,8 +393,8 @@ Z = Point(0,1)
 # multiexponention operation using simplified Pippenger
 def multiexp(*data):
     if len(data) == 1:
-        scalars = [datum[1] for datum in data[0]]
-        points = [datum[0] for datum in data[0]]
+        scalars = ScalarVector([datum[1] for datum in data[0]])
+        points = PointVector([datum[0] for datum in data[0]])
     else:
         scalars = data[0]
         points = data[1]
