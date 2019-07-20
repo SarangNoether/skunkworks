@@ -1,0 +1,166 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{hyperref}
+
+\title{Crypto Playtime}
+\author{Sarang Noether, Ph.D.}
+\date{Monero Research Lab}
+
+\begin{document}
+
+\maketitle
+
+Welcome! This workshop will guide you through simple cryptographic constructions using Python. These constructions are common in applied cryptography, and are similar to those used in Monero. Feel free to play around and learn, but please \textbf{do not use this library or the tools presented here for production code}. The library and tools have not been externally reviewed for security, and are intended only for basic algorithm prototyping and education.
+
+\section{The \texttt{dumb25519} library}
+The \texttt{dumb25519} library is a Python library that encapsulates basic elliptic curve cryptography similar to that used by Monero. Note that its representation of things like keys and hash functions, while mathematically sound, are not directly compatible with those used in the Monero codebase. The goal here is stupid simplicity. Find the library here:
+\begin{center}
+\url{https://github.com/SarangNoether/skunkworks/tree/curves/dumb25519}
+\end{center}
+Your Python 2.7-compatible installation will need the \texttt{random} and \texttt{hashlib} packages available to it.
+
+The library is a basic implementation of the \texttt{ed25519} twisted Edwards elliptic curve used by Monero and other projects. Fortunately, you don't need to know the details of how the curve works in order to build things with it (but there are plenty of great resources on this if you're curious). Most of the functionality is abstracted away by \texttt{dumb25519}.
+
+\subsection{Keys, points, and scalars}
+We typically care about private and public keys for basic cryptographic constructions. Private keys are represented as a modular integer; that is, a non-negative integer restricted by a particular range that depends on the curve. For \texttt{ed25519}, that number (called $l$ in the code) is around $2^{252}$. This wraps around, so you can keep incrementing such a private key modular integer, and it will eventually wrap to zero.
+
+Public keys, on the other hand, are typically represented as a point on the elliptic curve defined by the \texttt{ed25519} scheme. You can think of this (roughly) as a point on the $x$-$y$ plans on a complex-looking curve. In order to give our keys the expected structure, we need a ``starting point" or \textit{basepoint} on the curve. Any point will do, but the \texttt{ed25519} scheme defines one point in particular, called $G$. It's just a point that everyone agrees was chosen non-suspiciously, and is a public parameter of the curve scheme.
+
+If my private key is the modular integer $x$, then my public key is defined to be $X = xG$. That's right, you can multiply an integer by a curve point, and you get another curve point! There's a geometric definition for how this arises, but the library abstracts it away for you.
+
+You can also add curve points together, or subtract them. And this plays nicely with these modular integers (we call them \textit{scalars} too): $$X + X + X = 3X$$
+Note that you can't multiply or divide points. Sorry, not defined.
+
+There is a special point on the curve that we'll call the \textit{zero point} and denote by $Z$. It's not the number $0$ (curve points are points, not numbers), but a specific point. It has the property that it behaves like zero:
+\begin{eqnarray*}
+X + Z &=& X \\
+X - X &=& Z \\
+0X &=& Z
+\end{eqnarray*}
+We usually try to use lowercase letters to represent scalars, and uppercase letters to represent points. This helps us keep track of what's a number and what's a point on the curve.
+
+The reason we define private and public key pairs using this simple multiplication method is that the operation only works in one direction. If I hand you a private key (scalar), you can easily multiply it by the basepoint and generate the public key (point). But if I hand you an arbitrary public key (point), it's considered not possible to easily find the private key (scalar) that corresponds to it.
+
+\subsection{Data types}
+The \texttt{dumb25519} library has Scalar and Point types that handle all of the functionality described above. It also defines the basepoint $G$ and the zero point $Z$ for you. They have particular $x$-$y$ coordinates that you can look up in the library code if you're curious.
+
+You can generate a Scalar with the corresponding integer representation directly. You typically don't do this with Points, since they usually come from Scalar multiplication. You can also use \texttt{random\_scalar()} and \texttt{random\_point()} to generate them randomly for you, if you don't have particular values in mind.
+
+Algebra and arithmetic work basically like you might expect:
+
+\begin{verbatim}
+from dumb25519 import *
+
+# Generate a key pair
+x = random_scalar()
+X = x*G
+
+# Test some basic arithmetic
+P = random_point()
+Q = random_point()
+assert P + Q == Q + P # addition is commutative
+assert P - P == Z # the zero point
+assert P + P == Scalar(2)*P
+assert Z - Q == Scalar(-1)*Q
+\end{verbatim}
+
+\subsection{Hashing}
+It's very common in cryptographic applications to generate a fixed-length digest of a chunk of data. It should be easy to generate this digest, but very hard to invert and find out what data originally went in. This process is called \textit{hashing} the data, and the technique to do it is to use a \textit{hash function}. A hash function takes in whatever data you want and outputs some fixed-length representation.
+
+For our purposes, we either want to hash data and get a Scalar, or hash data and get a Point. The \texttt{dumb25519} library supports both, and you can pass in essentially whatever data you need:
+
+\begin{verbatim}
+from dumb25519 import *
+
+y = hash_to_scalar('arbitrary','data','here')
+
+P = hash_to_point(G)
+Q = hash_to_point(y,P,'test message',12345,random_scalar())
+\end{verbatim}
+You can go pretty crazy with hashing.
+
+
+\section{Challenge: Schnorr signature}
+For this challenge, we'll implement the popular Schnorr signature scheme. The idea is to take a message and sign it with a private key, such that anyone who knows the corresponding public key can verify the signature. Without knowing the private key, it isn't possible to forge a signature. Monero uses a variant of Schnorr signatures as its ring signature construction.
+
+To start, suppose you have a message $m$ that you wish to sign. This can be any hashable data type. Assume also that you have generated a private and public key in the usual way: the private key is a random Scalar $x$, and the public key is the Point $X = xG$ (where $G$ is the known basepoint).
+
+\subsection{Signing}
+To sign the message $m$ with private key $x$, do the following:
+\begin{enumerate}
+\item Select a random nonzero Scalar $a$.
+\item Compute the Scalar $c = H(m, aG)$ (where $H$ is a hash-to-scalar function).
+\item Compute the Scalar $s = a - cx$.
+\end{enumerate}
+The resulting signature is the Scalar pair $(c,s)$.
+
+\subsection{Verifying}
+To verify a signature $(c,s)$ on a message $m$ with public key $X$, do the following:
+\begin{enumerate}
+\item Compute the Scalar $d = H(m, sG+cX)$.
+\item Confirm that $d = c$.
+\end{enumerate}
+
+Observe why the signature works. The second component of the hash function simplifies, if it was generated correctly:
+\begin{eqnarray*}
+sG + cX &=& (a - cx)G + cX \\
+&=& aG - c(xG) + cX \\
+&=& aG - cX + cX \\
+&=& aG + Z \\
+&=& aG
+\end{eqnarray*}
+And, of course, $aG$ is what originally went into the hash function when signing!
+
+\subsection{Code}
+Use the \texttt{dumb25519} library to write a Schnorr signature implementation. The implementation should produce signatures on arbitrary messages using a specified private key, and verify signatures. If time permits, write a basic test suite.
+
+
+\section{Challenge: Pedersen commitment}
+For this challenge, we'll implement a particular application of Pedersen commitments. Pedersen commitments are a simple way to publicly ``commit" to a secret value, and later confirm that the value is what you claimed. They have many useful applications; in Monero, they are used to hide amounts and prove transaction balance. Note that if you are handed a commitment, it looks like a random Point; you cannot undo the commitment to figure out the value.
+
+\subsection{Commit and reveal}
+Everyone first needs to agree on two Points, $G$ and $H$. We usually use the standard curve basepoint $G$ and a hash-to-point result for $H$. (There are particular requirements on these Points, but for now we'll just say that they need to be ``effectively random" from each other.)
+
+To publicly commit to a secret Scalar value $v$, do the following:
+\begin{enumerate}
+\item Choose a random Scalar $m$ (called the \textit{mask}).
+\item Compute the Point $C = vH + mG$.
+\end{enumerate}
+The commitment is the point $C$.
+
+You can later show that you had committed to $v$ easily. Simply reveal $v$ and $m$, and anyone can reconstruct $C$.
+
+\subsection{Proving the same value}
+Suppose we want to do something different. Namely, I want to generate two Pedersen commitments to the same value and publicly prove this, but without revealing the secret value $v$. This is similar to what happens in Monero, where we want to prove that transaction inputs and outputs are the same, but not reveal the amount itself.
+
+It isn't enough to publicly look at the commitments and check that they are equal. If different masks are used (which should be the case!) with the same value, the resulting Points will look entirely random. Instead, we'll do something clever that involves the Schnorr work we did earlier.
+
+To generate commitments to a value $v$ and prove this, do the following:
+\begin{enumerate}
+\item Choose random masks $m$ and $n$.
+\item Compute the Pedersen commitments $C = vH + mG$ and $D = vH + nG$.
+\item Compute the message $m = H(C,D)$, where $H$ is a hash-to-scalar function.
+\item Generate a Schnorr signature on $m$; the private key should be the difference between masks $m-n$.
+\end{enumerate}
+Notice the cleverness here. The difference in commitments is $C-D = vH + mG - vH - nG = (m-n)G$. Because the values are the same, the result is the Point $(m-n)G$, which is a public key! The private key is $m-n$, which we can use in the Schnorr signature. Notice that we never reveal either of the masks $m$ or $n$ here; if we did, it may be possible for an attacker to brute-force the value $v$, which is not desirable. Further, notice that if the same value $v$ were not used in both commitments, we would not be able to identify the single public key in $C-D$.
+
+To publicly verify that a given Schnorr signature is valid for commitments $C$ and $D$, do the following:
+\begin{enumerate}
+\item Compute the message $m = H(C,D)$.
+\item Verify the Schnorr signature on $m$ using the public key $C-D$.
+\end{enumerate}
+This publicly convinces the verifier that $C$ and $D$ are commitments to the same value, but does not reveal anything about the value itself!
+
+\subsection{Code}
+Use the \texttt{dumb25519} library to write an implementation of this proving scheme. Given a value $v$, the code should produce commitments to $v$ and generate the proper Schnorr signature. It should also permit verification that two commitments are to the same value by verifying the Schnorr signature. Feel free to use your earlier Schnorr code to do this! If time permits, write a basic test suite.
+
+
+\section{Other fun challenges}
+Monero Research Lab researchers sometimes use the \texttt{dumb25519} library for easy initial prototyping of new ideas before investing time and effort in production code; it's a good way to check complex algebra for errors, and to iterate rapidly on new ideas. There are plenty of other cryptographic schemes you could implement. Here are two ideas:
+\begin{itemize}
+\item Look up details on the ElGamal encryption scheme, and implement encryption and decryption routines.
+\item Look up details on Monero's MLSAG and CLSAG signature schemes, which are signer-ambiguous linkable variants of Schnorr signatures; implement signing and verifying.
+\item If two Schnorr signatures are produced on different messages using the same private key and the same random value $a$, it is possible to trivially recover the private key. Write a tool that tests whether this has occurred when presented with two Schnorr signatures.
+\end{itemize}
+
+\end{document}
