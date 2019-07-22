@@ -122,60 +122,91 @@ class SpendTransaction:
     # Spend a coin
     #
     # INPUTS
-    #   coins: list of coins (spend and decoys)
-    #   l: spend index (corresponding coin must be recovered)
+    #   coins: list of coins (spends and decoys)
+    #   l: spend indices (corresponding coins must be recovered)
     #   dest: list of destination addresses (each a list)
     #   v: list of output coin values
     # DATA
     #   coins_in: input coins
     #   coins_out: output coins
-    #   C1: commitment offset
-    #   range: aggregate range proof
-    #   spend_proof: spend proof
+    #   C1: commitment offsets
+    #   range_proof: aggregate range proof
+    #   spend_proofs: spend proofs
     #   bal_c: balance proof c
     #   bal_z: balance proof z
-    def __init__(self,coins,l,dest,v):
+    def __init__(self,coins_in,l,dest,v):
         # Sanity checks
-        if not l < len(coins) or not l >= 0:
-            raise IndexError('Spent coin index out of bounds!')
-        if coins[l].p is None:
-            raise ValueError('Spent coin is not recovered!')
+        for i in l:
+            if not i < len(coins_in) or not i >= 0:
+                raise IndexError('Spent coin index out of bounds!')
+            if coins_in[i].p is None:
+                raise ValueError('Spent coin is not recovered!')
         if len(dest) == 0:
             raise ValueError('No output coins specified!')
         if not len(dest) == len(v):
             raise TypeError('Destination/value mismatch!')
         
-        self.coins_in = coins
-
         # Generate output coins
-        self.coins_out = []
+        coins_out = []
         r = [] # output coin masks
         for i in range(len(dest)):
             r.append(random_scalar())
-            self.coins_out.append(Coin(v[i],dest[i][0],dest[i][1],r[i],i))
+            coins_out.append(Coin(v[i],dest[i][0],dest[i][1],r[i],i))
 
         # Generate range proof
-        self.range = pybullet.prove([[v[i],self.coins_out[i].mask] for i in range(len(dest))],BITS)
+        range_proof = pybullet.prove([[v[i],coins_out[i].mask] for i in range(len(dest))],BITS)
 
-        # Offset input coin
-        delta = random_scalar()
-        self.C1 = coins[l].C - delta*Gc
+        # Offset input coins
+        delta = []
+        C1 = []
+        for i in range(len(l)):
+            delta.append(random_scalar())
+            C1.append(coins_in[l[i]].C - delta[i]*Gc)
 
         # Generate balance proof
         d = Scalar(0)
-        for i in range(len(self.coins_out)):
-            d += self.coins_out[i].mask
-        d -= (coins[l].mask - delta)
+        for i in range(len(coins_out)):
+            d += coins_out[i].mask
+        for i in range(len(l)):
+            d -= (coins_in[l[i]].mask - delta[i])
         r1 = random_scalar()
-        self.bal_c = hash_to_scalar(r1*Gc,self.coins_out,coins)
-        self.bal_z = r1 + d*self.bal_c
+        bal_c = hash_to_scalar(r1*Gc,coins_out,coins_in)
+        bal_z = r1 + d*bal_c
 
-        # Generate spend proof
-        self.spend_proof = spend.prove([coin.P for coin in coins],[coin.C for coin in coins],l,coins[l].v,coins[l].mask,delta,coins[l].p)
+        # Generate spend proofs
+        spend_proofs = []
+        for i in range(len(l)):
+            spend_proofs.append(spend.prove([coin.P for coin in coins_in],[coin.C for coin in coins_in],l[i],coins_in[l[i]].v,coins_in[l[i]].mask,delta[i],coins_in[l[i]].p))
+
+        self.coins_in = coins_in
+        self.coins_out = coins_out
+        self.C1 = C1
+        self.range_proof = range_proof
+        self.spend_proofs = spend_proofs
+        self.bal_c = bal_c
+        self.bal_z = bal_z
 
     # Verify the spend operation
     def verify(self):
-        spend.verify(self.spend_proof,[coin.P for coin in self.coins_in],[coin.C for coin in self.coins_in],self.C1)
+        # Verify balance proof
+        R = self.bal_z*Gc
+        for i in range(len(self.coins_out)):
+            R -= self.bal_c*self.coins_out[i].C
+        for i in range(len(self.C1)):
+            R += self.bal_c*self.C1[i]
+        if not hash_to_scalar(R,self.coins_out,self.coins_in) == self.bal_c:
+            raise ArithmeticError('Bad balance proof!')
+
+        # Verify spend proofs
+        for i in range(len(self.spend_proofs)):
+            spend.verify(self.spend_proofs[i],[coin.P for coin in self.coins_in],[coin.C for coin in self.coins_in],self.C1[i])
+
+        # Verify range proof
+        pybullet.verify([self.range_proof],BITS)
+
+# We need the ring to be large enough for this example
+if not RING > 2:
+    raise ValueError('Ring size is too small!')
 
 # Private addresses
 print 'Generating addresses...'
@@ -192,34 +223,40 @@ except ValueError:
 else:
     raise ValueError('Out-of-range mint should not succeed!')
 
-# Mint a coin to Alice and recover
-print 'Minting coin to Alice...'
-mint = MintTransaction(MINT,alice[0]*G,alice[1]*G)
+# Mint coins to Alice and recover
+print 'Minting coins to Alice...'
+tx_mint_1 = MintTransaction(MINT,alice[0]*G,alice[1]*G)
+tx_mint_2 = MintTransaction(MINT,alice[0]*G,alice[1]*G)
 print 'Verifying...'
-mint.verify()
+tx_mint_1.verify()
+tx_mint_2.verify()
 print 'Recovering...'
-mint.recover(alice[0],alice[1])
-if not mint.coin.v == MINT:
+tx_mint_1.recover(alice[0],alice[1])
+tx_mint_2.recover(alice[0],alice[1])
+if not com(tx_mint_1.coin.v,tx_mint_1.coin.mask) == tx_mint_1.coin.C:
+    raise ValueError('Bad mint recovery!')
+if not com(tx_mint_2.coin.v,tx_mint_2.coin.mask) == tx_mint_2.coin.C:
     raise ValueError('Bad mint recovery!')
 
-# Bob cannot recover the minted coin
+# Bob cannot recover a minted coin
 try:
     print 'Attempting invalid recovery...'
-    mint.recover(bob[0],bob[1])
+    tx_mint_1.recover(bob[0],bob[1])
 except ValueError:
     pass
 else:
     raise ValueError('Bob should not recover a mint to Alice!')
 
 # Generate ring with decoys
-print 'Building decoys...'
+print 'Building ring...'
 ring = []
 for i in range(RING):
     ring.append(Coin(Scalar(10),random_point(),random_point(),random_scalar(),random_scalar()))
-ring[1] = mint.coin
+ring[0] = tx_mint_1.coin
+ring[1] = tx_mint_2.coin
 
-# Alice spends the coin to Bob
-print 'Spending coin from Alice to Bob...'
-spend_tx = SpendTransaction(ring,1,[[bob[0]*G,bob[1]*G]],[MINT])
+# Alice spends the coins to Bob
+print 'Spending coins from Alice to Bob...'
+tx_spend = SpendTransaction(ring,[0,1],[[bob[0]*G,bob[1]*G]],[Scalar(2)*MINT])
 print 'Verifying...'
-spend_tx.verify()
+tx_spend.verify()
