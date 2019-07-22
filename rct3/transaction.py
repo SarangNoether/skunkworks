@@ -5,6 +5,7 @@ from dumb25519 import *
 import elgamal
 import signature
 import pybullet
+import spend
 
 class Coin:
     # Generate a new coin
@@ -103,11 +104,11 @@ class MintTransaction:
 
         # Prove the committed value is valid
         mask = hash_to_scalar('mask',hash_to_scalar(r*X2,1))
-        self.proof = signature.sign(hash_to_scalar(self.coin),mask,G)
+        self.proof = signature.sign(hash_to_scalar(self.coin),mask,Gc)
 
     # Verify the mint operation
     def verify(self):
-        signature.verify(hash_to_scalar(self.coin),self.coin.C-self.v*H,self.proof,G)
+        signature.verify(hash_to_scalar(self.coin),self.coin.C-self.v*Hc,self.proof,Gc)
 
     # Recover the minted coin
     #
@@ -126,9 +127,11 @@ class SpendTransaction:
     #   dest: list of destination addresses (each a list)
     #   v: list of output coin values
     # DATA
-    #   coins: output coins
+    #   coins_in: input coins
+    #   coins_out: output coins
+    #   C1: commitment offset
     #   range: aggregate range proof
-    #   spend: spend proof
+    #   spend_proof: spend proof
     #   bal_c: balance proof c
     #   bal_z: balance proof z
     def __init__(self,coins,l,dest,v):
@@ -141,33 +144,38 @@ class SpendTransaction:
             raise ValueError('No output coins specified!')
         if not len(dest) == len(v):
             raise TypeError('Destination/value mismatch!')
+        
+        self.coins_in = coins
 
         # Generate output coins
-        self.coins = []
+        self.coins_out = []
         r = [] # output coin masks
         for i in range(len(dest)):
             r.append(random_scalar())
-            self.coins.append(Coin(v[i],dest[i][0],dest[i][1],r[i],i))
+            self.coins_out.append(Coin(v[i],dest[i][0],dest[i][1],r[i],i))
 
         # Generate range proof
-        self.range = pybullet.prove([[v[i],self.coins[i].mask] for i in range(len(dest))],BITS)
+        self.range = pybullet.prove([[v[i],self.coins_out[i].mask] for i in range(len(dest))],BITS)
 
         # Offset input coin
         delta = random_scalar()
-        C1 = coins[l].C - delta*G
+        self.C1 = coins[l].C - delta*Gc
 
         # Generate balance proof
         d = Scalar(0)
-        for i in range(len(coins)):
-            d += self.coins[i].mask
+        for i in range(len(self.coins_out)):
+            d += self.coins_out[i].mask
         d -= (coins[l].mask - delta)
         r1 = random_scalar()
-        self.bal_c = hash_to_scalar(r1*G,self.coins,coins)
+        self.bal_c = hash_to_scalar(r1*Gc,self.coins_out,coins)
         self.bal_z = r1 + d*self.bal_c
+
+        # Generate spend proof
+        self.spend_proof = spend.prove([coin.P for coin in coins],[coin.C for coin in coins],l,coins[l].v,coins[l].mask,delta,coins[l].p)
 
     # Verify the spend operation
     def verify(self):
-        pass
+        spend.verify(self.spend_proof,[coin.P for coin in self.coins_in],[coin.C for coin in self.coins_in],self.C1)
 
 # Private addresses
 print 'Generating addresses...'
@@ -203,6 +211,15 @@ except ValueError:
 else:
     raise ValueError('Bob should not recover a mint to Alice!')
 
+# Generate ring with decoys
+print 'Building decoys...'
+ring = []
+for i in range(RING):
+    ring.append(Coin(Scalar(10),random_point(),random_point(),random_scalar(),random_scalar()))
+ring[1] = mint.coin
+
 # Alice spends the coin to Bob
 print 'Spending coin from Alice to Bob...'
-spend = SpendTransaction([mint.coin],0,[[bob[0]*G,bob[1]*G]],[MINT])
+spend_tx = SpendTransaction(ring,1,[[bob[0]*G,bob[1]*G]],[MINT])
+print 'Verifying...'
+spend_tx.verify()
