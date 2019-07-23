@@ -65,7 +65,7 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
         bR.append(bL[i] - Scalar(1))
 
     # Point generation
-    H = hash_to_point(repr(Y))
+    H = hash_to_point(repr(pk) + repr(C_in) + repr(C1))
     alpha = random_scalar()
     beta = random_scalar()
     p = random_scalar()
@@ -91,7 +91,7 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
     S3 = r_sk*U1
 
     # Challenge 1
-    temp = repr(Y) + repr(B) + repr(A) + repr(S1) + repr(S2) + repr(S3) + repr(U1)
+    temp = repr(pk) + repr(C_in) + repr(C1) + repr(B) + repr(A) + repr(S1) + repr(S2) + repr(S3) + repr(U1)
     y = hash_to_scalar(1,temp)
     z = hash_to_scalar(2,temp)
     w = hash_to_scalar(3,temp)
@@ -160,15 +160,12 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
 #   C1: commitment offset (Point)
 def verify(proof,pk,C_in,C1):
     # Construct ring
-    Y = []
     temp = repr(pk) + repr(C_in) + repr(C1)
     d1 = hash_to_scalar(1,temp)
     d2 = hash_to_scalar(2,temp)
-    for i in range(RING):
-        Y.append(pk[i] + d1*(C_in[i]-C1) + d2*G0)
 
     # Construct challenges
-    temp = repr(Y) + repr(proof.B) + repr(proof.A) + repr(proof.S1) + repr(proof.S2) + repr(proof.S3) + repr(proof.U1)
+    temp = repr(pk) + repr(C_in) + repr(C1) + repr(proof.B) + repr(proof.A) + repr(proof.S1) + repr(proof.S2) + repr(proof.S3) + repr(proof.U1)
     y = hash_to_scalar(1,temp)
     z = hash_to_scalar(2,temp)
     w = hash_to_scalar(3,temp)
@@ -177,7 +174,7 @@ def verify(proof,pk,C_in,C1):
     x = hash_to_scalar(temp)
 
     # Useful values
-    H = hash_to_point(repr(Y))
+    H = hash_to_point(repr(pk) + repr(C_in) + repr(C1))
     vec_1 = ScalarVector([Scalar(1)]*RING)
     vec_y = ScalarVector([y**i for i in range(RING)])
 
@@ -215,7 +212,10 @@ def verify(proof,pk,C_in,C1):
     data.append([proof.A,w])
     data.append([proof.S2,x])
     for i in range(RING):
-        data.append([Y[i],-z])
+        data.append([pk[i],-z])
+        data.append([C_in[i],-z*d1])
+        data.append([C1,z*d1])
+        data.append([G0,-z*d2])
         data.append([Hi[i],(w*z*y**i + z**2)*(y.invert()**i)])
     for i in range(len(data)):
         data[i][1] *= w3
