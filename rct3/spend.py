@@ -231,11 +231,11 @@ def verify(proof,pk,C_in,C1):
     data.append([proof.B,Scalar(1)])
     data.append([proof.A,w])
     data.append([proof.S2,x])
+    data.append([G0,-Scalar(RING)*z*d2])
     for i in range(RING):
         data.append([pk[i],-z])
         data.append([C_in[i],-z*d1])
         data.append([C1,z*d1])
-        data.append([G0,-z*d2])
         data.append([Hi[i],(w*z*y**i + z**2)*(y.invert()**i)])
     for i in range(len(data)):
         data[i][1] *= w3
