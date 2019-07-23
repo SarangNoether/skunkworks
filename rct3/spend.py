@@ -1,5 +1,6 @@
 from dumb25519 import *
 from common import *
+import transcript
 
 # Spend proof
 class SpendProof:
@@ -39,6 +40,9 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
     if not len(pk) == RING or not len(C_in) == RING:
         raise IndexError('Bad input ring size!')
 
+    # Begin transcript
+    tr = transcript.Transcript('RCT3 spend')
+
     # Key image
     U1 = sk.invert()*U
 
@@ -47,9 +51,11 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
 
     # Construct ring
     Y = []
-    temp = repr(pk) + repr(C_in) + repr(C1)
-    d1 = hash_to_scalar('H2',1,temp)
-    d2 = hash_to_scalar('H2',2,temp)
+    tr.update(pk)
+    tr.update(C_in)
+    tr.update(C1)
+    d1 = tr.challenge()
+    d2 = tr.challenge()
     for i in range(RING):
         Y.append(pk[i] + d1*(C_in[i]-C1) + d2*G0)
 
@@ -65,7 +71,7 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
         bR.append(bL[i] - Scalar(1))
 
     # Point generation
-    H = hash_to_point('H3',repr(pk) + repr(C_in) + repr(C1))
+    H = hash_to_point(tr.challenge())
     alpha = random_scalar()
     beta = random_scalar()
     p = random_scalar()
@@ -91,10 +97,15 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
     S3 = r_sk*U1
 
     # Challenge 1
-    temp = repr(pk) + repr(C_in) + repr(C1) + repr(B) + repr(A) + repr(S1) + repr(S2) + repr(S3) + repr(U1)
-    y = hash_to_scalar('H4',1,temp)
-    z = hash_to_scalar('H4',2,temp)
-    w = hash_to_scalar('H4',3,temp)
+    tr.update(B)
+    tr.update(A)
+    tr.update(S1)
+    tr.update(S2)
+    tr.update(S3)
+    tr.update(U1)
+    y = tr.challenge()
+    z = tr.challenge()
+    w = tr.challenge()
 
     # Commit 2
     vec_1 = ScalarVector([Scalar(1)]*RING)
@@ -114,8 +125,9 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
     T2 = t2*G + tau2*H
 
     # Challenge 2
-    temp = repr(w) + repr(y) + repr(z) + repr(T1) + repr(T2)
-    x = hash_to_scalar('H5',temp)
+    tr.update(T1)
+    tr.update(T2)
+    x = tr.challenge()
 
     # Response
     l = l0 + l1*x
@@ -159,22 +171,30 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
 #   C_in: list of corresponding input commitments (Points)
 #   C1: commitment offset (Point)
 def verify(proof,pk,C_in,C1):
-    # Construct ring
-    temp = repr(pk) + repr(C_in) + repr(C1)
-    d1 = hash_to_scalar('H2',1,temp)
-    d2 = hash_to_scalar('H2',2,temp)
+    # Begin transcript
+    tr = transcript.Transcript('RCT3 spend')
 
     # Construct challenges
-    temp = repr(pk) + repr(C_in) + repr(C1) + repr(proof.B) + repr(proof.A) + repr(proof.S1) + repr(proof.S2) + repr(proof.S3) + repr(proof.U1)
-    y = hash_to_scalar('H4',1,temp)
-    z = hash_to_scalar('H4',2,temp)
-    w = hash_to_scalar('H4',3,temp)
+    tr.update(pk)
+    tr.update(C_in)
+    tr.update(C1)
+    d1 = tr.challenge()
+    d2 = tr.challenge()
+    H = hash_to_point(tr.challenge())
+    tr.update(proof.B)
+    tr.update(proof.A)
+    tr.update(proof.S1)
+    tr.update(proof.S2)
+    tr.update(proof.S3)
+    tr.update(proof.U1)
+    y = tr.challenge()
+    z = tr.challenge()
+    w = tr.challenge()
+    tr.update(proof.T1)
+    tr.update(proof.T2)
+    x = tr.challenge()
 
-    temp = repr(w) + repr(y) + repr(z) + repr(proof.T1) + repr(proof.T2)
-    x = hash_to_scalar('H5',temp)
-
-    # Useful values
-    H = hash_to_point('H3',repr(pk) + repr(C_in) + repr(C1))
+    # Useful vectors
     vec_1 = ScalarVector([Scalar(1)]*RING)
     vec_y = ScalarVector([y**i for i in range(RING)])
 
