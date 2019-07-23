@@ -48,8 +48,8 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
     # Construct ring
     Y = []
     temp = repr(pk) + repr(C_in) + repr(C1)
-    d1 = hash_to_scalar(1,temp)
-    d2 = hash_to_scalar(2,temp)
+    d1 = hash_to_scalar('H2',1,temp)
+    d2 = hash_to_scalar('H2',2,temp)
     for i in range(RING):
         Y.append(pk[i] + d1*(C_in[i]-C1) + d2*G0)
 
@@ -65,7 +65,7 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
         bR.append(bL[i] - Scalar(1))
 
     # Point generation
-    H = hash_to_point(repr(pk) + repr(C_in) + repr(C1))
+    H = hash_to_point('H3',repr(pk) + repr(C_in) + repr(C1))
     alpha = random_scalar()
     beta = random_scalar()
     p = random_scalar()
@@ -92,9 +92,9 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
 
     # Challenge 1
     temp = repr(pk) + repr(C_in) + repr(C1) + repr(B) + repr(A) + repr(S1) + repr(S2) + repr(S3) + repr(U1)
-    y = hash_to_scalar(1,temp)
-    z = hash_to_scalar(2,temp)
-    w = hash_to_scalar(3,temp)
+    y = hash_to_scalar('H4',1,temp)
+    z = hash_to_scalar('H4',2,temp)
+    w = hash_to_scalar('H4',3,temp)
 
     # Commit 2
     vec_1 = ScalarVector([Scalar(1)]*RING)
@@ -115,7 +115,7 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
 
     # Challenge 2
     temp = repr(w) + repr(y) + repr(z) + repr(T1) + repr(T2)
-    x = hash_to_scalar(temp)
+    x = hash_to_scalar('H5',temp)
 
     # Response
     l = l0 + l1*x
@@ -161,20 +161,20 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
 def verify(proof,pk,C_in,C1):
     # Construct ring
     temp = repr(pk) + repr(C_in) + repr(C1)
-    d1 = hash_to_scalar(1,temp)
-    d2 = hash_to_scalar(2,temp)
+    d1 = hash_to_scalar('H2',1,temp)
+    d2 = hash_to_scalar('H2',2,temp)
 
     # Construct challenges
     temp = repr(pk) + repr(C_in) + repr(C1) + repr(proof.B) + repr(proof.A) + repr(proof.S1) + repr(proof.S2) + repr(proof.S3) + repr(proof.U1)
-    y = hash_to_scalar(1,temp)
-    z = hash_to_scalar(2,temp)
-    w = hash_to_scalar(3,temp)
+    y = hash_to_scalar('H4',1,temp)
+    z = hash_to_scalar('H4',2,temp)
+    w = hash_to_scalar('H4',3,temp)
 
     temp = repr(w) + repr(y) + repr(z) + repr(proof.T1) + repr(proof.T2)
-    x = hash_to_scalar(temp)
+    x = hash_to_scalar('H5',temp)
 
     # Useful values
-    H = hash_to_point(repr(pk) + repr(C_in) + repr(C1))
+    H = hash_to_point('H3',repr(pk) + repr(C_in) + repr(C1))
     vec_1 = ScalarVector([Scalar(1)]*RING)
     vec_y = ScalarVector([y**i for i in range(RING)])
 
