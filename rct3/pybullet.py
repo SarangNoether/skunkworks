@@ -1,5 +1,6 @@
 import dumb25519
 from dumb25519 import Scalar, Point, ScalarVector, PointVector, random_scalar, random_point, hash_to_scalar, hash_to_point
+from common import *
 
 cache = '' # rolling transcript hash
 inv8 = Scalar(8).invert()
@@ -99,8 +100,6 @@ def prove(data,N):
     M = len(data)
 
     # curve points
-    G = dumb25519.G
-    H = hash_to_point('pybullet H')
     Gi = PointVector([hash_to_point('pybullet Gi ' + str(i)) for i in range(M*N)])
     Hi = PointVector([hash_to_point('pybullet Hi ' + str(i)) for i in range(M*N)])
 
@@ -108,7 +107,7 @@ def prove(data,N):
     V = PointVector([])
     aL = ScalarVector([])
     for v,gamma in data:
-        V.append((H*v + G*gamma)*inv8)
+        V.append(com(v,gamma)*inv8)
         mash(V[-1])
         aL.extend(scalar_to_bits(v,N))
 
@@ -118,12 +117,12 @@ def prove(data,N):
         aR.append(bit-Scalar(1))
 
     alpha = random_scalar()
-    A = (Gi*aL + Hi*aR + G*alpha)*inv8
+    A = (Gi*aL + Hi*aR + Gc*alpha)*inv8
 
     sL = ScalarVector([random_scalar()]*(M*N))
     sR = ScalarVector([random_scalar()]*(M*N))
     rho = random_scalar()
-    S = (Gi*sL + Hi*sR + G*rho)*inv8
+    S = (Gi*sL + Hi*sR + Gc*rho)*inv8
 
     # get challenges
     mash(A)
@@ -160,8 +159,8 @@ def prove(data,N):
 
     tau1 = random_scalar()
     tau2 = random_scalar()
-    T1 = (H*t1 + G*tau1)*inv8
-    T2 = (H*t2 + G*tau2)*inv8
+    T1 = com(t1,tau1)*inv8
+    T2 = com(t2,tau2)*inv8
 
     mash(T1)
     mash(T2)
@@ -186,7 +185,7 @@ def prove(data,N):
     R = PointVector([])
    
     # initial inner product inputs
-    data_ip = [Gi,PointVector([Hi[i]*(y_inv**i) for i in range(len(Hi))]),H*x_ip,l,r,None,None]
+    data_ip = [Gi,PointVector([Hi[i]*(y_inv**i) for i in range(len(Hi))]),Hc*x_ip,l,r,None,None]
     while True:
         data_ip = inner_product(data_ip)
 
@@ -209,8 +208,6 @@ def verify(proofs,N):
 
     # curve points
     Z = dumb25519.Z
-    G = dumb25519.G
-    H = hash_to_point('pybullet H')
     Gi = PointVector([hash_to_point('pybullet Gi ' + str(i)) for i in range(max_MN)])
     Hi = PointVector([hash_to_point('pybullet Hi ' + str(i)) for i in range(max_MN)])
 
@@ -327,9 +324,9 @@ def verify(proofs,N):
     
     # now check all proofs together
     scalars.append(-y0-z1)
-    points.append(G)
+    points.append(Gc)
     scalars.append(-y1+z3)
-    points.append(H)
+    points.append(Hc)
     for i in range(max_MN):
         scalars.append(-z4[i])
         points.append(Gi[i])
