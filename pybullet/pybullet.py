@@ -1,24 +1,52 @@
 import dumb25519
 from dumb25519 import Scalar, Point, ScalarVector, PointVector, random_scalar, random_point, hash_to_scalar, hash_to_point
+import transcript
 
-cache = '' # rolling transcript hash
 inv8 = Scalar(8).invert()
 
-# Add to a transcript hash
-def mash(s):
-    global cache
-    cache = hash_to_scalar(cache,s)
+# Proof structure
+class Bulletproof:
+    def __init__(self,V,A,S,T1,T2,taux,mu,L,R,a,b,t):
+        self.V = V
+        self.A = A
+        self.S = S
+        self.T1 = T1
+        self.T2 = T2
+        self.taux = taux
+        self.mu = mu
+        self.L = L
+        self.R = R
+        self.a = a
+        self.b = b
+        self.t = t
 
-# Clear the transcript hash
-def clear_cache():
-    global cache
-    cache = ''
+# Data for a round of the inner product argument
+class InnerProductRound:
+    def __init__(self,G,H,U,a,b,tr):
+        # Common data
+        self.G = G
+        self.H = H
+        self.U = U
+        self.done = False
+
+        # Prover data
+        self.a = a
+        self.b = b
+
+        # Verifier data (appended lists)
+        self.L = PointVector([])
+        self.R = PointVector([])
+
+        # Transcript
+        self.tr = tr
 
 # Turn a scalar into a vector of bit scalars
-# s: Scalar
-# N: int; number of bits
 #
-# returns: ScalarVector
+# INPUTS
+#   s: (Scalar)
+#   N: number of bits (int)
+# OUTPUTS
+#   ScalarVector
 def scalar_to_bits(s,N):
     result = []
     for i in range(N-1,-1,-1):
@@ -30,18 +58,22 @@ def scalar_to_bits(s,N):
     return ScalarVector(list(reversed(result)))
 
 # Generate a vector of powers of a scalar
-# s: Scalar
-# l: int; number of powers to include
 #
-# returns: ScalarVector
+# INPUTS
+#   s: (Scalar)
+#   l: number of powers to include (int)
+# OUTPUTS
+#   ScalarVector
 def exp_scalar(s,l):
     return ScalarVector([s**i for i in range(l)])
 
 # Sum the powers of a scalar
-# s: Scalar
-# l: int; number of powers to include
 #
-# returns: Scalar; s^0+s^1+...+s^(l-1)
+# INPUTS
+#   s: (Scalar)
+#   l: number of powers to include (int)
+# OUTPUTS
+#   s^0+s^1+...+s^(l-1) (Scalar)
 def sum_scalar(s,l):
     if not l & (l-1) == 0:
         raise ValueError('We need l to be a power of 2!')
@@ -59,43 +91,42 @@ def sum_scalar(s,l):
     return r
 
 # Perform an inner-product proof round
-# G,H: PointVector
-# U: Point
-# a,b: ScalarVector
 #
-# returns: G',H',U,a',b',L,R
+# INPUTS
+#   data: round data (InnerProductRound)
 def inner_product(data):
-    G,H,U,a,b,L,R = data
-
-    n = len(G)
+    n = len(data.G)
     if n == 1:
-        return [a[0],b[0]]
+        data.done = True
+        data.a = data.a[0]
+        data.b = data.b[0]
+        return
 
     n /= 2
-    cL = a[:n]**b[n:]
-    cR = a[n:]**b[:n]
-    L = (G[n:]*a[:n] + H[:n]*b[n:] + U*cL)*inv8
-    R = (G[:n]*a[n:] + H[n:]*b[:n] + U*cR)*inv8
+    cL = data.a[:n]**data.b[n:]
+    cR = data.a[n:]**data.b[:n]
+    data.L.append((data.G[n:]*data.a[:n] + data.H[:n]*data.b[n:] + data.U*cL)*inv8)
+    data.R.append((data.G[:n]*data.a[n:] + data.H[n:]*data.b[:n] + data.U*cR)*inv8)
 
-    mash(L)
-    mash(R)
-    x = cache
+    data.tr.update(data.L[-1])
+    data.tr.update(data.R[-1])
+    x = data.tr.challenge()
 
-    G = (G[:n]*x.invert())*(G[n:]*x)
-    H = (H[:n]*x)*(H[n:]*x.invert())
+    data.G = (data.G[:n]*x.invert())*(data.G[n:]*x)
+    data.H = (data.H[:n]*x)*(data.H[n:]*x.invert())
 
-    a = a[:n]*x + a[n:]*x.invert()
-    b = b[:n]*x.invert() + b[n:]*x
-    
-    return [G,H,U,a,b,L,R]
+    data.a = data.a[:n]*x + data.a[n:]*x.invert()
+    data.b = data.b[:n]*x.invert() + data.b[n:]*x
 
 # Generate a multi-output proof
-# data: [Scalar,Scalar] pairs; amount values and masks
-# N: number of bits in range
 #
-# returns: list of proof data
+# INPUTS
+#   data: list of value/mask pairs (Scalars)
+#   N: number of bits in range (int)
+# OUTPUTS
+#   Bulletproof
 def prove(data,N):
-    clear_cache()
+    tr = transcript.Transcript('Bulletproof')
     M = len(data)
 
     # curve points
@@ -109,7 +140,7 @@ def prove(data,N):
     aL = ScalarVector([])
     for v,gamma in data:
         V.append((H*v + G*gamma)*inv8)
-        mash(V[-1])
+        tr.update(V[-1])
         aL.extend(scalar_to_bits(v,N))
 
     # set bit arrays
@@ -126,12 +157,11 @@ def prove(data,N):
     S = (Gi*sL + Hi*sR + G*rho)*inv8
 
     # get challenges
-    mash(A)
-    mash(S)
-    y = cache
+    tr.update(A)
+    tr.update(S)
+    y = tr.challenge()
+    z = tr.challenge()
     y_inv = y.invert()
-    mash('')
-    z = cache
 
     # polynomial coefficients
     l0 = aL - ScalarVector([z]*(M*N))
@@ -163,9 +193,9 @@ def prove(data,N):
     T1 = (H*t1 + G*tau1)*inv8
     T2 = (H*t2 + G*tau2)*inv8
 
-    mash(T1)
-    mash(T2)
-    x = cache # challenge
+    tr.update(T1)
+    tr.update(T2)
+    x = tr.challenge()
 
     taux = tau1*x + tau2*(x**2)
     for j in range(1,M+1):
@@ -177,35 +207,33 @@ def prove(data,N):
     r = r0 + r1*x
     t = l**r
 
-    mash(taux)
-    mash(mu)
-    mash(t)
+    tr.update(taux)
+    tr.update(mu)
+    tr.update(t)
+    x_ip = tr.challenge()
 
-    x_ip = cache # challenge
     L = PointVector([])
     R = PointVector([])
    
     # initial inner product inputs
-    data_ip = [Gi,PointVector([Hi[i]*(y_inv**i) for i in range(len(Hi))]),H*x_ip,l,r,None,None]
+    data = InnerProductRound(Gi,PointVector([Hi[i]*(y_inv**i) for i in range(len(Hi))]),H*x_ip,l,r,tr)
     while True:
-        data_ip = inner_product(data_ip)
+        inner_product(data)
 
         # we have reached the end of the recursion
-        if len(data_ip) == 2:
-            return [V,A,S,T1,T2,taux,mu,L,R,data_ip[0],data_ip[1],t]
-
-        # we are not done yet
-        L.append(data_ip[-2])
-        R.append(data_ip[-1])
+        if data.done:
+            return Bulletproof(V,A,S,T1,T2,taux,mu,data.L,data.R,data.a,data.b,t)
 
 # Verify a batch of multi-output proofs
-# proofs: list of proof data lists
-# N: number of bits in range
 #
-# returns: True if all proofs are valid
+# INPUTS
+#   proofs: list of proofs (Bulletproofs)
+#   N: number of bits in range (int)
+# OUTPUTS
+#   True if all proofs are valid
 def verify(proofs,N):
     # determine the length of the longest proof
-    max_MN = 2**max([len(proof[7]) for proof in proofs])
+    max_MN = 2**max([len(proof.L) for proof in proofs])
 
     # curve points
     Z = dumb25519.Z
@@ -226,9 +254,20 @@ def verify(proofs,N):
 
     # run through each proof
     for proof in proofs:
-        clear_cache()
+        tr = transcript.Transcript('Bulletproof')
 
-        V,A,S,T1,T2,taux,mu,L,R,a,b,t = proof
+        V = proof.V
+        A = proof.A
+        S = proof.S
+        T1 = proof.T1
+        T2 = proof.T2
+        taux = proof.taux
+        mu = proof.mu
+        L = proof.L
+        R = proof.R
+        a = proof.a
+        b = proof.b
+        t = proof.t
 
         # get size information
         M = 2**len(L)/N
@@ -239,30 +278,29 @@ def verify(proofs,N):
         if weight_y == Scalar(0) or weight_z == Scalar(0):
             raise ArithmeticError
 
-        # reconstruct all challenges
+        # reconstruct challenges
         for v in V:
-            mash(v)
-        mash(A)
-        mash(S)
-        if cache == Scalar(0):
+            tr.update(v)
+        tr.update(A)
+        tr.update(S)
+        y = tr.challenge()
+        if y == Scalar(0):
             raise ArithmeticError
-        y = cache
         y_inv = y.invert()
-        mash('')
-        if cache == Scalar(0):
+        z = tr.challenge()
+        if z == Scalar(0):
             raise ArithmeticError
-        z = cache
-        mash(T1)
-        mash(T2)
-        if cache == Scalar(0):
+        tr.update(T1)
+        tr.update(T2)
+        x = tr.challenge()
+        if x == Scalar(0):
             raise ArithmeticError
-        x = cache
-        mash(taux)
-        mash(mu)
-        mash(t)
-        if cache == Scalar(0):
+        tr.update(taux)
+        tr.update(mu)
+        tr.update(t)
+        x_ip = tr.challenge()
+        if x_ip == Scalar(0):
             raise ArithmeticError
-        x_ip = cache
 
         y0 += taux*weight_y
         
@@ -288,11 +326,11 @@ def verify(proofs,N):
         # inner product
         W = ScalarVector([])
         for i in range(len(L)):
-            mash(L[i])
-            mash(R[i])
-            if cache == Scalar(0):
+            tr.update(L[i])
+            tr.update(R[i])
+            W.append(tr.challenge())
+            if W[i] == Scalar(0):
                 raise ArithmeticError
-            W.append(cache)
         W_inv = W.invert()
 
         for i in range(M*N):
@@ -337,6 +375,6 @@ def verify(proofs,N):
         points.append(Hi[i])
 
     if not dumb25519.multiexp(scalars,points) == Z:
-        raise ArithmeticError('Bad z check!')
+        raise ArithmeticError('Bad verification!')
 
     return True
