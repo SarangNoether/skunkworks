@@ -3,8 +3,8 @@
 from dumb25519 import *
 
 class Transcript:
-    # Initialize the transcript, optionally with a fixed prefix
-    def __init__(self,prefix=None):
+    # Initialize the transcript
+    def __init__(self,prefix):
         self.state = hash_to_scalar(prefix)
 
     # Update the transcript with public data
