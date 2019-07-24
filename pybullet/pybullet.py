@@ -39,11 +39,9 @@ def decomp(val,size):
     return r
 
 # Perform an inner-product proof round
-# G,H: PointVector
-# U: Point
-# a,b: ScalarVector
 #
-# returns: G',H',U,a',b',L,R,aa,bb,P
+# INPUTS
+#   data: round data (InnerProductRound)
 def inner_product(data):
     n = len(data.G)
     if n == 1:
