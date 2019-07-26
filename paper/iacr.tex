@@ -102,7 +102,7 @@ We refer to the linkability tag as the \textit{key image} for consistency with t
 \begin{description}
 \item[Correctly verified:] For any message $m$, $d$-dimensional secret key $\textbf{sk}$ with corresponding public key $\textbf{pk}$, and appropriately-sized matrix $\underline{\textbf{pk}} = \left\{\textbf{pk}_1, \ldots, \textbf{pk}_n\right\}$, if there exists an index $1 \leq \ell \leq n$ such that $\textbf{pk} = \textbf{pk}_\ell$, then $\texttt{Verify}(\texttt{Sign}(m, \underline{\textbf{pk}}, \textbf{sk})) = 1$.
 
-\item[Correctly linkable:] For any messages $m$, $m^\prime$, any $d$-dimensional secret keys  $\textbf{sk}$ and $\textbf{sk}^\prime$ with equal linking keys (that is, with $\textbf{sk}_0 = \textbf{sk}^\prime_0$) and with corresponding public keys $\textbf{pk}$ and $\textbf{pk}^\prime$ respectively, any appropriately-sized pair of matrices $\underline{\textbf{pk}}$ and $\underline{\textbf{pk}}^\prime$, if $(\sigma, \mathfrak{T}) \leftarrow \texttt{Sign}(m, \underline{\textbf{pk}}, \textbf{sk})$ and $(\sigma^\prime, \mathfrak{T}^\prime) \leftarrow \texttt{Sign}(m^\prime, \underline{\textbf{pk}}^\prime, \textbf{sk}^\prime)$ and there exists a pair of indices $\ell$ and $\ell^\prime$ such that $\underline{\textbf{pk}}_\ell = \textbf{pk}$ and $\underline{\textbf{pk}}_{\ell^\prime} = \textbf{pk}^\prime$, then
+\item[Correctly linkable:] For any messages $m$, $m^\prime$, any $d$-dimensional secret keys  $\textbf{sk}$ and $\textbf{sk}^\prime$ with equal linking keys (that is, with $\textbf{sk}_0 = \textbf{sk}^\prime_0$) and with corresponding public keys $\textbf{pk}$ and $\textbf{pk}^\prime$ respectively, any appropriately-sized pair of matrices $\underline{\textbf{pk}}$ and $\underline{\textbf{pk}}^\prime$, if $(\sigma, \mathfrak{T}) \leftarrow \texttt{Sign}(m, \underline{\textbf{pk}}, \textbf{sk})$ and $(\sigma^\prime, \mathfrak{T}^\prime) \leftarrow \texttt{Sign}(m^\prime, \underline{\textbf{pk}}^\prime, \textbf{sk}^\prime)$ such that $\underline{\textbf{pk}}_\ell = \textbf{pk}$ and $\underline{\textbf{pk}}_{\ell^\prime} = \textbf{pk}^\prime$, then
 $\texttt{Link}((\sigma, \mathfrak{T}), (\sigma^\prime, \mathfrak{T}^\prime))=1$.
 \end{description}
 
@@ -169,7 +169,7 @@ The following tuple $(\texttt{Setup}, \texttt{KeyGen}, \texttt{Sign}, \texttt{Ve
 \item $\texttt{Sign}$ computes the \textit{aggregation coefficients} $\mu_X$ and $\{\mu_j\}_{j=1}^{d-1}$, the \textit{linkability tag} or \textit{key image} $\mathfrak{T}$, and auxiliary key images $\{\mathfrak{D}_j\}_{j=1}^{d-1}$:
 \begin{align*}
 \mathfrak{T} \leftarrow& x \mathcal{H}^p(X_\ell) & \mu_X \leftarrow& \mathcal{H}^s_0(\underline{\textbf{pk}} \mid \mid \mathfrak{T} \mid \mid \{\mathfrak{D}_j\}_{j=1}^{d-1}) \\
-\{\mathfrak{D}_j\} \leftarrow&  \{z_j \mathcal{H}^p(X_\ell)\} & \mu_j \leftarrow& \mathcal{H}^s_1(\underline{\textbf{pk}} \mid \mid \mathfrak{T} \mid \mid \{\mathfrak{D}_j\}_{j=1}^{d-1}).
+\{\mathfrak{D}_j\} \leftarrow&  \{z_j \mathcal{H}^p(X_\ell)\} & \mu_j \leftarrow& \mathcal{H}^s_j(\underline{\textbf{pk}} \mid \mid \mathfrak{T} \mid \mid \{\mathfrak{D}_j\}_{j=1}^{d-1}).
 \end{align*}
 
 \item For $i = \ell, \ell+1, \ldots, \ell-1$, identifying index $n$ with index $1$ as usual, $\texttt{Sign}$ computes
@@ -328,7 +328,7 @@ Let $k \in \mathbb{N}$. We say a PPT algorithm $\texttt{A}$ is a $(t, \epsilon)$
 \subsection{Defining forgeries}
 We use a modified version of the definition of existential forgery with insider corruption for a ring signature by Bender, Katz, and Morselli \cite{bender}. By using linkability tags, our definition is slightly stronger; we allow forgeries to count as successful either with partially-corrupted rings or with messages that the signing oracle has signed before, just so long as neither the signature nor the linkability tag from the forgery appear as output from any oracle query in any transcript. This prevents a malicious party with the ability to persuade users to sign maliciously selected messages with maliciously selected ring members from constructing ostensibly valid, previously-unseen signature-tag pairs.
 
-We use the following in the next definition. Let $n(-)$ be a positive polynomial. Let $\mathcal{H}^s:\left\{0,1\right\}^* \to \mathbb{Z}/p\mathbb{Z}$ be modeled as a random oracle. Let $\mathcal{CO}$ be a corruption oracle that takes as input a public key $\textbf{pk}$ and produces as output the corresponding secret key $\textbf{sk}$ and the linkability tag $\mathfrak{T}$. Let $C$ be the set of all keys in the transcript of queries made by $\texttt{A}$ to $\mathcal{CO}$. Let $T_C$ be the set of all linkability tags that appear as output from such a query. Let $\mathcal{SO}$ be a signing oracle that takes as input some $(m, \underline{\textbf{pk}}^\prime, \ell)$ such that $pk_\ell \in \underline{\textbf{pk}} \cap \underline{\textbf{pk}^\prime}$ and produces as output a signature-tag pair $(\sigma, \mathfrak{T})$ such that $\texttt{Verify}(m, \underline{\textbf{pk}}^\prime, \sigma, \mathfrak{T}) = 1$.
+We use the following in the next definition. Let $n(-)$ be a positive polynomial. Let $\mathcal{H}^s:\left\{0,1\right\}^* \to \mathbb{Z}/p\mathbb{Z}$ be modeled as a random oracle. Let $\mathcal{CO}$ be a corruption oracle that takes as input a public key $\textbf{pk}$ from the list of challenge keys and produces as output the corresponding secret key $\textbf{sk}$ and the linkability tag $\mathfrak{T}$. Let $C$ be the set of all keys in the transcript of queries made by $\texttt{A}$ to $\mathcal{CO}$. Let $T_C$ be the set of all linkability tags that appear as output from such a query. Let $\mathcal{SO}$ be a signing oracle that takes as input some $(m, \underline{\textbf{pk}}^\prime, \ell)$ such that $\underline{\textbf{pk}^\prime}$ is a matrix of challenge key vectors (i.e.\ each column is in $\textbf{pk}$) and produces as output a signature-tag pair $(\sigma, \mathfrak{T})$ such that $\texttt{Verify}(m, \underline{\textbf{pk}}^\prime, \sigma, \mathfrak{T}) = 1$ and $\mathfrak{T}$ is the linkability tag for the $\ell^{th}$ key in $\underline{\textbf{pk}}^\prime$.
 
 \begin{defn}[Existential unforgeability of linkable ring signatures with respect to insider corruption]\label{def:unf}
 
@@ -345,6 +345,12 @@ We say a PPT algorithm $\texttt{A}$  is a $(t, \epsilon, q_h, q_c, q_s,  n(-))$-
 
 These success requirements ensure that (i) any ring member whose linkability tag is $\mathfrak{T}$ has not yet had its corresponding private key corrupted by $\mathcal{CO}$; and (ii) the signature itself has not been produced by the signing oracle. This allows the attacker to perhaps re-use a message $m$ and linkability tag $\mathfrak{T}$ from a previous oracle query. If the attacker can produce a new signature $\sigma^\prime$ on a message that has been signed before by the oracle then the new signature should still count as a forgery.
 
+
+\begin{remark}
+Note that if the corruption oracle merely acted by computing arbitrary discrete logarithms, then an adversary could do the following: take some target $\textbf{pk}$ from the challenge set, apply a permutation to the coordinates of $\textbf{pk}$, pass the permuted key through $\mathcal{CO}$, obtain the discrete logarithm of the first (signing) key of $\textbf{pk}$, compute the linkability tag for this signing key, and lastly produce a signature using $\texttt{Sign}$. 
+
+Such a signature would pass validation and not be described as a forgery according to our definition. Our definition avoids this problem by requiring the corruption oracle only be queried with challenge keys. This way, a corruption oracle can be simulated for the black box execution of $\texttt{A}$.
+\end{remark}
 
 \subsection{The Forking Lemma} To prove that the existence of a forger implies that of a $k$-OMDL solver, we use the forking lemma. In the following, we presume the bit length $\eta$ is used to describe group elements in $\mathbb{G}$ and scalars in $\mathbb{Z}/p\mathbb{Z}$, i.e.\ $\eta = O(\left|p\right|)$.
 
@@ -446,7 +452,7 @@ Let where $d, q_h, q_c, q_s$ satisfy the hypotheses and let $\texttt{A}$ be a $(
 
 We show our scheme is computationally signer-ambiguous if the following DDH game is hard in $\mathbb{G}$.
 
-\begin{defn}[Decisional Diffie-Hellman]\label{ddhgame} Let $\texttt{A}$ be any computationally unbounded PPT algorithm, $(p, \mathbb{G}, G)$ and let $n \in \mathbb{N}$.
+\begin{defn}[Decisional Diffie-Hellman]\label{ddhgame} Let $\texttt{A}$ be any PPT algorithm, $(p, \mathbb{G}, G)$ and let $n \in \mathbb{N}$.
 \begin{enumerate}
 \item The challenger selects $(r_{i,1}, r_{i,2}, r_{i,3}) \left(\mathbb{Z}/p\mathbb{Z}\right)^3$ uniformly and independently for $i=1, \ldots, n$. The challenger computes the public keys $R_{i,1} = r_{i,1} G$, $R_{i,2} = r_{i,2}G$, $R_{i,3}^{(0)} = r_{i,1} r_{i,2} G$, $R_{i,3}^{(1)} = r_{i,3} G$.
 
