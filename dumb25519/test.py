@@ -3,6 +3,38 @@
 from dumb25519 import *
 import unittest
 
+class TestEncoding(unittest.TestCase):
+    def test_G(self):
+        self.assertEqual(repr(G),'5866666666666666666666666666666666666666666666666666666666666666')
+        self.assertEqual(Point('5866666666666666666666666666666666666666666666666666666666666666'),G)
+
+    def test_Z(self):
+        self.assertEqual(repr(Z),'0100000000000000000000000000000000000000000000000000000000000000')
+        self.assertEqual(Point('0100000000000000000000000000000000000000000000000000000000000000'),Z)
+
+    def test_0(self):
+        self.assertEqual(repr(Scalar(0)),'0000000000000000000000000000000000000000000000000000000000000000')
+        self.assertEqual(Scalar('0000000000000000000000000000000000000000000000000000000000000000'),Scalar(0))
+
+    def test_1(self):
+        self.assertEqual(repr(Scalar(1)),'0100000000000000000000000000000000000000000000000000000000000000')
+        self.assertEqual(Scalar('0100000000000000000000000000000000000000000000000000000000000000'),Scalar(1))
+
+    def test_8(self):
+        eight = Scalar('0800000000000000000000000000000000000000000000000000000000000000')
+        inv_8 = Scalar('792fdce229e50661d0da1c7db39dd30700000000000000000000000000000006')
+        self.assertEqual(eight*inv_8,Scalar(1))
+
+    def test_keys(self):
+        tests = []
+        tests.append(['1ad5f2d49b9a9aff87a178e34dd676b92560ce1c17ef581101403d86d3e0420a','2c173a515d472f4088f3716bb4ae7ded9c8a116811767028b41ac11189d52930'])
+        tests.append(['925ca4f809e42f9adb719c0561681d529d579cbb800c88485606df0f69f86c0a','c1cae3aedde97856d20b3a1a475ea14fc6726ec365d084019e62cb45e6881b46'])
+        tests.append(['ec683df871ccdb1c6b0bb0f8170db4bce5f54e6f66946c05b32c2a6c510d2807','16d3b58656c049dcdd7fa53d6d6c4d9be6420498095d3eceffd568fe612fa488'])
+
+        for test in tests:
+            self.assertEqual(Scalar(test[0])*G,Point(test[1]))
+            self.assertEqual(repr(Scalar(test[0])*G),test[1])
+
 class TestPoint(unittest.TestCase):
     def test_point_ops(self):
         with self.assertRaises(TypeError):
@@ -348,5 +380,5 @@ class TestVectorOps(unittest.TestCase):
         with self.assertRaises(ArithmeticError):
             ScalarVector([Scalar(1),Scalar(0)]).invert()
 
-for test in [TestPoint,TestScalar,TestMixed,TestOthers,TestVectorOps,TestMultiexp]:
+for test in [TestPoint,TestScalar,TestMixed,TestOthers,TestVectorOps,TestMultiexp,TestEncoding]:
     unittest.TextTestRunner(verbosity=2,failfast=True).run(unittest.TestLoader().loadTestsFromTestCase(test))
