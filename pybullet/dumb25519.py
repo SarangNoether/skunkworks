@@ -6,11 +6,13 @@
 
 import random
 import hashlib
+import binascii
 
 # curve parameters
 q = 2**255 - 19
 l = 2**252 + 27742317777372353535851937790883648493
 cofactor = 8
+b = 256 # bit representation
 
 # Internal helper methods
 def exponent(b,e,m):
@@ -28,14 +30,26 @@ def xfromy(y):
         x = q-x
     return x
 
+def bit(h,i):
+    return (ord(h[i/8]) >> (i%8)) & 1
+
 d = -121665 * invert(121666,q)
 I = exponent(2,(q-1)/4,q)
 
 class Scalar:
     def __init__(self,x):
-        if not isinstance(x,int) and not isinstance(x,long):
+        # Generated from an integer value
+        if isinstance(x,int) or isinstance(x,long):
+            self.x = x % l
+        # Generated from a hex representation
+        elif isinstance(x,str):
+            try:
+                x = binascii.unhexlify(x)
+                self.x = sum(2**i * bit(x,i) for i in range(0,b)) % l
+            except:
+                raise TypeError
+        else:
             raise TypeError
-        self.x = x % l
 
     def invert(self):
         if self.x == 0:
@@ -106,7 +120,8 @@ class Scalar:
         raise TypeError
 
     def __repr__(self):
-        return '<Scalar> x:'+str(self.x)
+        bits = [(self.x >> i) & 1 for i in range(b)]
+        return binascii.hexlify(''.join([chr(sum([bits[i*8+j] << j for j in range(8)])) for i in range(b/8)]))
 
     def __int__(self):
         return self.x
@@ -122,13 +137,20 @@ class Scalar:
         return Scalar(-self.x)
 
 class Point:
-    def __init__(self,x,y):
-        if not isinstance(x,long) and not isinstance(x,int):
+    def __init__(self,x,y=None):
+        # Generated from integer values
+        if (isinstance(x,long) or isinstance(x,int)) and (isinstance(y,long) or isinstance(y,int)) and y is not None:
+            self.x = x
+            self.y = y
+        # Generated from a hex representation
+        elif isinstance(x,str) and y is None:
+            x = binascii.unhexlify(x)
+            self.y = sum(2**i * bit(x,i) for i in range(0,b-1))
+            self.x = xfromy(self.y)
+            if self.x & 1 != bit(x,b-1):
+                self.x = q - self.x
+        else:
             raise TypeError
-        if not isinstance(y,long) and not isinstance(y,int):
-            raise TypeError
-        self.x = x
-        self.y = y
 
     def __eq__(self,Q):
         if not isinstance(Q,Point):
@@ -179,7 +201,8 @@ class Point:
         return self*y
 
     def __repr__(self):
-        return '<Point> x:'+str(self.x)+'|y:'+str(self.y)
+        bits = [(self.y >> i) & 1 for i in range(b-1)] + [self.x & 1]
+        return binascii.hexlify(''.join([chr(sum([bits[i*8+j] << j for j in range(8)])) for i in range(b/8)]))
 
     # determines if the point is on the curve
     def on_curve(self):
@@ -390,11 +413,11 @@ Z = Point(0,1)
 # multiexponention operation using simplified Pippenger
 def multiexp(*data):
     if len(data) == 1:
-        scalars = [datum[1] for datum in data[0]]
-        points = [datum[0] for datum in data[0]]
+        scalars = ScalarVector([datum[1] for datum in data[0]])
+        points = PointVector([datum[0] for datum in data[0]])
     else:
-        scalars = data[0]
-        points = data[1]
+        scalars = ScalarVector(data[0])
+        points = PointVector(data[1])
 
     if not isinstance(scalars,ScalarVector) or not isinstance(points,PointVector):
         raise TypeError
@@ -447,7 +470,3 @@ def multiexp(*data):
             if pail != Z:
                 result += pail
     return result
-
-# Set random seed
-def set_seed(seed):
-    random.seed(seed)

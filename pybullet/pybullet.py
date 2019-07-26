@@ -1,5 +1,10 @@
 import dumb25519
 from dumb25519 import Scalar, Point, ScalarVector, PointVector, random_scalar, random_point, hash_to_scalar, hash_to_point
+import random
+
+# Set random seed
+def set_seed(seed):
+    random.seed(seed)
 
 cache = '' # rolling transcript hash
 inv8 = Scalar(8).invert()
@@ -157,7 +162,7 @@ def inner_product(data):
 # returns: ProofA object
 def prove_A(v,gamma,k,seed=None):
     if seed is not None:
-        dumb25519.set_seed(seed)
+        set_seed(seed)
 
     # internal state
     state = PlayerState()
@@ -210,7 +215,7 @@ def prove_A(v,gamma,k,seed=None):
 # returns: ProofB object
 def prove_B(state,y,z,seed=None):
     if seed is not None:
-        dumb25519.set_seed(seed)
+        set_seed(seed)
 
     # check for bad challenges
     if y == Scalar(0) or z == Scalar(0):
@@ -270,7 +275,7 @@ def prove_B(state,y,z,seed=None):
 # returns: ProofC object
 def prove_C(state,x,seed=None):
     if seed is not None:
-        dumb25519.set_seed(seed)
+        set_seed(seed)
 
     # check for bad challenge
     if x == Scalar(0):

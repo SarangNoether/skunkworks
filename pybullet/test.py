@@ -258,7 +258,7 @@ class TestKnownProofs(unittest.TestCase):
         gamma = Scalar(23579) # abitrary commitment blinder
         pybullet.N = 2
 
-        dumb25519.set_seed(seed)
+        pybullet.set_seed(seed)
         alpha = random_scalar()
         sL = ScalarVector([random_scalar()]*pybullet.N)
         sR = ScalarVector([random_scalar()]*pybullet.N)
@@ -279,7 +279,7 @@ class TestKnownProofs(unittest.TestCase):
 
         # B-proof
         seed = 2 # arbitrary
-        dumb25519.set_seed(seed)
+        pybullet.set_seed(seed)
         y = Scalar(8675309) # arbitrary nonzero challenge
         z = Scalar(3141592) # arbitrary nonzero challenge
 
@@ -302,7 +302,7 @@ class TestKnownProofs(unittest.TestCase):
 
         # C-proof
         seed = 3 # arbitrary
-        dumb25519.set_seed(seed)
+        pybullet.set_seed(seed)
         x = Scalar(2718281) # arbitrary nonzero challenge
 
         taux = tau2*x**2 + tau1*x + z**2*gamma
