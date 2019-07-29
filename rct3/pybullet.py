@@ -211,9 +211,6 @@ def prove(data,N):
     tr.update(t)
     x_ip = tr.challenge()
 
-    L = PointVector([])
-    R = PointVector([])
-   
     # initial inner product inputs
     data = InnerProductRound(Gi,PointVector([Hi[i]*(y_inv**i) for i in range(len(Hi))]),Hc*x_ip,l,r,tr)
     while True:

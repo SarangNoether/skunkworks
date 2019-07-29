@@ -17,11 +17,60 @@ class SpendProof:
         self.z_a = None
         self.z_sk = None
         self.z_d = None
-        self.l = None
-        self.r = None
+        self.L = None
+        self.R = None
+        self.a = None
+        self.b = None
         self.t = None
-        self.P = None
         self.U1 = None
+
+# Data for a round of the inner product argument
+class InnerProductRound:
+    def __init__(self,G,H,U,a,b,tr):
+        # Common data
+        self.G = G
+        self.H = H
+        self.U = U
+        self.done = False
+
+        # Prover data
+        self.a = a
+        self.b = b
+
+        # Verifier data (appended lists)
+        self.L = PointVector([])
+        self.R = PointVector([])
+
+        # Transcript
+        self.tr = tr
+
+# Perform an inner-product proof round
+#
+# INPUTS
+#   data: round data (InnerProductRound)
+def inner_product(data):
+    n = len(data.G)
+    if n == 1:
+        data.done = True
+        data.a = data.a[0]
+        data.b = data.b[0]
+        return
+
+    n /= 2
+    cL = data.a[:n]**data.b[n:]
+    cR = data.a[n:]**data.b[:n]
+    data.L.append(data.G[n:]*data.a[:n] + data.H[:n]*data.b[n:] + data.U*cL)
+    data.R.append(data.G[:n]*data.a[n:] + data.H[n:]*data.b[:n] + data.U*cR)
+
+    data.tr.update(data.L[-1])
+    data.tr.update(data.R[-1])
+    x = data.tr.challenge()
+
+    data.G = (data.G[:n]*x.invert())*(data.G[n:]*x)
+    data.H = (data.H[:n]*x)*(data.H[n:]*x.invert())
+
+    data.a = data.a[:n]*x + data.a[n:]*x.invert()
+    data.b = data.b[:n]*x.invert() + data.b[n:]*x
 
 # Generate a spend proof
 #
@@ -39,6 +88,8 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
     # Sanity checks
     if not len(pk) == RING or not len(C_in) == RING:
         raise IndexError('Bad input ring size!')
+    if not power2(RING):
+        raise IndexError('Bad input ring size!')
 
     # Begin transcript
     tr = transcript.Transcript('RCT3 spend')
@@ -50,7 +101,7 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
     C1 = C_in[k] - delta*Gc # offset commitment
 
     # Construct ring
-    Y = []
+    Y = PointVector([])
     tr.update(pk)
     tr.update(C_in)
     tr.update(C1)
@@ -104,6 +155,7 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
     tr.update(S3)
     tr.update(U1)
     y = tr.challenge()
+    y_inv = y.invert()
     z = tr.challenge()
     w = tr.challenge()
 
@@ -133,14 +185,26 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
     l = l0 + l1*x
     r = r0 + r1*x
     t = l**r
-    P = Z
-    for i in range(RING):
-        P += l[i]*Y[i] + (y.invert()**i*r[i])*Hi[i]
     tau_x = tau1*x + tau2*(x**2)
     mu = alpha + beta*w + p*x
     z_a = r_a + alpha*x
     z_sk = r_sk + sk*x
     z_d = r_d + delta*x
+
+    # Inner product compression
+    tr.update(tau_x)
+    tr.update(mu)
+    tr.update(t)
+    tr.update(z_a)
+    tr.update(z_sk)
+    tr.update(z_d)
+    x_ip = tr.challenge()
+
+    data = InnerProductRound(Y,PointVector([Hi[i]*(y_inv**i) for i in range(len(Hi))]),G_ip*x_ip,l,r,tr)
+    while True:
+        inner_product(data)
+        if data.done:
+            break
 
     # Construct proof
     proof = SpendProof()
@@ -156,10 +220,11 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
     proof.z_a = z_a
     proof.z_sk = z_sk
     proof.z_d = z_d
-    proof.l = l
-    proof.r = r
+    proof.L = data.L
+    proof.R = data.R
+    proof.a = data.a
+    proof.b = data.b
     proof.t = t
-    proof.P = P
     proof.U1 = U1
     return proof
 
@@ -188,6 +253,7 @@ def verify(proof,pk,C_in,C1):
     tr.update(proof.S3)
     tr.update(proof.U1)
     y = tr.challenge()
+    y_inv = y.invert()
     z = tr.challenge()
     w = tr.challenge()
     tr.update(proof.T1)
@@ -236,7 +302,7 @@ def verify(proof,pk,C_in,C1):
         data.append([pk[i],-z])
         data.append([C_in[i],-z*d1])
         data.append([C1,z*d1])
-        data.append([Hi[i],(w*z*y**i + z**2)*(y.invert()**i)])
+        data.append([Hi[i],(w*z*y**i + z**2)*(y_inv**i)])
     for i in range(len(data)):
         data[i][1] *= w3
     check.extend(data)
