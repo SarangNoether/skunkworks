@@ -23,6 +23,7 @@ class SpendProof:
         self.b = None
         self.t = None
         self.U1 = None
+        self.P = None
 
 # Data for a round of the inner product argument
 class InnerProductRound:
@@ -191,6 +192,11 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
     z_sk = r_sk + sk*x
     z_d = r_d + delta*x
 
+    # P computation (TODO: not needed later)
+    P = Z
+    for i in range(RING):
+        P += l[i]*Y[i] + (y_inv**i*r[i])*Hi[i]
+
     # Inner product compression
     tr.update(tau_x)
     tr.update(mu)
@@ -226,6 +232,7 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
     proof.b = data.b
     proof.t = t
     proof.U1 = U1
+    proof.P = P
     return proof
 
 # Verify a spend proof
@@ -259,12 +266,17 @@ def verify(proof,pk,C_in,C1):
     tr.update(proof.T1)
     tr.update(proof.T2)
     x = tr.challenge()
+    tr.update(proof.tau_x)
+    tr.update(proof.mu)
+    tr.update(proof.t)
+    tr.update(proof.z_a)
+    tr.update(proof.z_sk)
+    tr.update(proof.z_d)
+    x_ip = tr.challenge()
 
     # Useful vectors
     vec_1 = ScalarVector([Scalar(1)]*RING)
     vec_y = ScalarVector([y**i for i in range(RING)])
-
-    check = [] # the final multiexp data
 
     # Generate nonzero random weights (indexed by equation number)
     w2 = Scalar(0)
@@ -279,6 +291,43 @@ def verify(proof,pk,C_in,C1):
     w5 = Scalar(0)
     while w5 == Scalar(0):
         w5 = random_scalar()
+
+    # Inner product reconstruction
+    W = ScalarVector([])
+    for i in range(len(proof.L)):
+        tr.update(proof.L[i])
+        tr.update(proof.R[i])
+        W.append(tr.challenge())
+        if W[i] == Scalar(0):
+            raise ArithmeticError
+    W_inv = W.invert()
+
+    check = Z
+    for i in range(RING):
+        index = i
+        g = proof.a
+        h = proof.b*((y_inv)**i)
+        for j in range(len(proof.L)-1,-1,-1):
+            J = len(W)-j-1
+            base_power = 2**j
+            if index/base_power == 0:
+                g *= W_inv[J]
+                h *= W[J]
+            else:
+                g *= W[J]
+                h *= W_inv[J]
+                index -= base_power
+
+        check += g*(pk[i] + d1*(C_in[i]-C1) + d2*G0) + h*Hi[i]
+
+    check += x_ip*(proof.a*proof.b-proof.t)*G_ip
+    for j in range(len(proof.L)):
+        check -= W[j]**2*proof.L[j]
+        check -= W[j].invert()**2*proof.R[j]
+    if not check == proof.P:
+        raise ArithmeticError('Failed verification!')
+
+    check = [] # the final multiexp data
 
     # Check 2
     data = []

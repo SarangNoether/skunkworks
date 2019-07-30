@@ -322,6 +322,9 @@ class ScalarVector:
             return self.scalars[i]
         return ScalarVector(self.scalars[i])
 
+    def __setitem__(self,i,val):
+        self.scalars[i] = val
+
     def append(self,item):
         if not isinstance(item,Scalar):
             raise TypeError
