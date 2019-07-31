@@ -279,6 +279,9 @@ def verify(proof,pk,C_in,C1):
     vec_y = ScalarVector([y**i for i in range(RING)])
 
     # Generate nonzero random weights (indexed by equation number)
+    w1 = Scalar(0)
+    while w1 == Scalar(0):
+        w1 = random_scalar()
     w2 = Scalar(0)
     while w2 == Scalar(0):
         w2 = random_scalar()
@@ -292,7 +295,10 @@ def verify(proof,pk,C_in,C1):
     while w5 == Scalar(0):
         w5 = random_scalar()
 
-    # Inner product reconstruction
+    check = [] # the final multiexp data
+
+    # Check 1
+    data = []
     W = ScalarVector([])
     for i in range(len(proof.L)):
         tr.update(proof.L[i])
@@ -302,7 +308,6 @@ def verify(proof,pk,C_in,C1):
             raise ArithmeticError
     W_inv = W.invert()
 
-    check = Z
     for i in range(RING):
         index = i
         g = proof.a
@@ -318,16 +323,19 @@ def verify(proof,pk,C_in,C1):
                 h *= W_inv[J]
                 index -= base_power
 
-        check += g*(pk[i] + d1*(C_in[i]-C1) + d2*G0) + h*Hi[i]
+        data.append([pk[i],g])
+        data.append([C_in[i]-C1,g*d1])
+        data.append([G0,g*d2])
+        data.append([Hi[i],h])
 
-    check += x_ip*(proof.a*proof.b-proof.t)*G_ip
+    data.append([G_ip,x_ip*(proof.a*proof.b-proof.t)])
     for j in range(len(proof.L)):
-        check -= W[j]**2*proof.L[j]
-        check -= W[j].invert()**2*proof.R[j]
-    if not check == proof.P:
-        raise ArithmeticError('Failed verification!')
-
-    check = [] # the final multiexp data
+        data.append([proof.L[j],-W[j]**2])
+        data.append([proof.R[j],-W_inv[j]**2])
+    data.append([proof.P,Scalar(-1)])
+    for i in range(len(data)):
+        data[i][1] *= w2
+    check.extend(data)
 
     # Check 2
     data = []
@@ -349,8 +357,7 @@ def verify(proof,pk,C_in,C1):
     data.append([G0,-Scalar(RING)*z*d2])
     for i in range(RING):
         data.append([pk[i],-z])
-        data.append([C_in[i],-z*d1])
-        data.append([C1,z*d1])
+        data.append([C1-C_in[i],z*d1])
         data.append([Hi[i],(w*z*y**i + z**2)*(y_inv**i)])
     for i in range(len(data)):
         data[i][1] *= w3
