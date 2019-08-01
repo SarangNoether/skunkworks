@@ -126,6 +126,7 @@ class SpendTransaction:
     #   l: spend indices (corresponding coins must be recovered)
     #   dest: list of destination addresses (each a list)
     #   v: list of output coin values
+    #   f: fee
     # DATA
     #   coins_in: input coins
     #   coins_out: output coins
@@ -134,7 +135,8 @@ class SpendTransaction:
     #   spend_proofs: spend proofs
     #   bal_c: balance proof c
     #   bal_z: balance proof z
-    def __init__(self,coins_in,l,dest,v):
+    #   f: fee
+    def __init__(self,coins_in,l,dest,v,f):
         # Sanity checks
         for i in l:
             if not i < len(coins_in) or not i >= 0:
@@ -170,7 +172,7 @@ class SpendTransaction:
         for i in range(len(l)):
             d -= (coins_in[l[i]].mask - delta[i])
         r1 = random_scalar()
-        bal_c = hash_to_scalar(r1*Gc,coins_out,coins_in)
+        bal_c = hash_to_scalar(r1*Gc,coins_out,coins_in,f)
         bal_z = r1 + d*bal_c
 
         # Generate spend proofs
@@ -185,6 +187,7 @@ class SpendTransaction:
         self.spend_proofs = spend_proofs
         self.bal_c = bal_c
         self.bal_z = bal_z
+        self.f = f
 
     # Verify the spend operation
     def verify(self):
@@ -192,9 +195,10 @@ class SpendTransaction:
         R = self.bal_z*Gc
         for i in range(len(self.coins_out)):
             R -= self.bal_c*self.coins_out[i].C
+        R -= self.bal_c*self.f*Hc # account for fee
         for i in range(len(self.C1)):
             R += self.bal_c*self.C1[i]
-        if not hash_to_scalar(R,self.coins_out,self.coins_in) == self.bal_c:
+        if not hash_to_scalar(R,self.coins_out,self.coins_in,self.f) == self.bal_c:
             raise ArithmeticError('Bad balance proof!')
 
         # Verify spend proofs
@@ -214,9 +218,8 @@ alice = [random_scalar(),random_scalar()]
 bob = [random_scalar(),random_scalar()]
 
 # Mint a coin with value too high
-MINT = Scalar(1) # value
+print 'Attempting mint with invalid value...'
 try:
-    print 'Attempting mint with invalid value...'
     mint = MintTransaction(Scalar(2)**BITS,alice[0]*G,alice[1]*G)
 except ValueError:
     pass
@@ -225,8 +228,8 @@ else:
 
 # Mint coins to Alice and recover
 print 'Minting coins to Alice...'
-tx_mint_1 = MintTransaction(MINT,alice[0]*G,alice[1]*G)
-tx_mint_2 = MintTransaction(MINT,alice[0]*G,alice[1]*G)
+tx_mint_1 = MintTransaction(Scalar(1),alice[0]*G,alice[1]*G)
+tx_mint_2 = MintTransaction(Scalar(2),alice[0]*G,alice[1]*G)
 print 'Verifying...'
 tx_mint_1.verify()
 tx_mint_2.verify()
@@ -239,8 +242,8 @@ if not com(tx_mint_2.coin.v,tx_mint_2.coin.mask) == tx_mint_2.coin.C:
     raise ValueError('Bad mint recovery!')
 
 # Bob cannot recover a minted coin
+print 'Attempting invalid recovery...'
 try:
-    print 'Attempting invalid recovery...'
     tx_mint_1.recover(bob[0],bob[1])
 except ValueError:
     pass
@@ -257,6 +260,16 @@ ring[1] = tx_mint_2.coin
 
 # Alice spends the coins to Bob
 print 'Spending coins from Alice to Bob...'
-tx_spend = SpendTransaction(ring,[0,1],[[bob[0]*G,bob[1]*G]],[Scalar(2)*MINT])
+tx_spend = SpendTransaction(ring,[0,1],[[bob[0]*G,bob[1]*G]],[Scalar(2)],Scalar(1))
 print 'Verifying...'
 tx_spend.verify()
+
+# Bad balance
+print 'Attempting spend with bad balance...'
+try:
+    tx_spend = SpendTransaction(ring,[0,1],[[bob[0]*G,bob[1]*G]],[Scalar(2)],Scalar(0))
+    tx_spend.verify()
+except ArithmeticError:
+    pass
+else:
+    raise ArithmeticError('Spend with bad balance should not verify!')
