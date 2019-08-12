@@ -7,6 +7,9 @@
 #
 # Two valid signatures containing the same key image were signed with the same
 # private key, regardless of the other ring members used in the signature.
+#
+# NOTE: The use of this construction in the multi-input case is not advised
+# due to the common signing index across inputs.
 
 import dumb25519
 from dumb25519 import hash_to_scalar, hash_to_point, random_scalar, G
