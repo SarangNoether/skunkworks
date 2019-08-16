@@ -19,7 +19,7 @@ Spend transactions contain a Bulletproof-style proof for each spend demonstratin
 
 Note that our notation for size and time estimates differs from that of the paper, in order to match existing notation elsewhere.
 
-To examine the size of a spend transaction, assume that `M` inputs are spend with an anonymity set of size `N`, and that `T` outputs are generated, where `T` is a power of two and currently restricted to `T <= 16`. Note that in most typical transactions, `M = T = 2`. All sizes are listed in scalar/group elements, each of which is a 32-byte representation.
+To examine the size of a spend transaction, assume that `M` inputs are spent with an anonymity set of size `N`, and that `T` outputs are generated, where `T` is a power of two and currently restricted to `T <= 16`. Note that in most typical transactions, `M = T = 2`. All sizes are listed in scalar/group elements, each of which is a 32-byte representation.
 
 Component | Size
 --------- | ----
