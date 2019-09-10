@@ -51,18 +51,18 @@ class Proof:
         return temp
 
 # Compute an aggregate Fiat-Shamir challenge
-def challenge(proofs):
+def challenge(M,proofs):
     A = [proof.A for proof in proofs]
     B = [proof.B for proof in proofs]
     C = [proof.C for proof in proofs]
     D = [proof.D for proof in proofs]
     G = [proof.G for proof in proofs]
     Q = [proof.Q for proof in proofs]
-    return hash_to_scalar(A,B,C,D,G,Q)
+    return hash_to_scalar(M,A,B,C,D,G,Q)
 
 # Double-blinded Pedersen matrix commitment
 def com_matrix(v,r):
-    C = dumb25519.Z
+    C = r*H
     for j in range(len(v)):
         for i in range(len(v[0])):
             C += hash_to_point('Gi',j,i)*v[j][i]
@@ -149,7 +149,7 @@ def prove_initial(M,l,v,r,n,m):
     rD = random_scalar()
 
     # Commit to zero-sum blinders
-    a = [[random_scalar()]*n for _ in range(m)]
+    a = [[random_scalar() for _ in range(n)] for _ in range(m)]
     for j in range(m):
         a[j][0] = Scalar(0)
         for i in range(1,n):
@@ -277,7 +277,7 @@ def prove_final(proof,state):
 #  M: list of double-blinded Pedersen commitments such that len(M) == n**m
 #  proof: proof structure
 #  n,m: dimensions such that len(M) == n**m
-#  x: aggregate Fiat-Shamir challenge
+#  x: aggregate Fiat-Shamir challenge (in practice this is computed by the verifier)
 # RETURNS
 #  True if the proof is valid
 def verify(M,proof,n,m,x):

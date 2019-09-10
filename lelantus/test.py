@@ -100,7 +100,7 @@ class TestGroth(unittest.TestCase):
         m = 1
         l = 0
         proof,state = groth.prove_initial(M,l,v,r,n,m)
-        state.x = groth.challenge([proof])
+        state.x = groth.challenge(M,[proof])
         proof,gammas = groth.prove_final(proof,state)
         groth.verify(M,proof,n,m,state.x)
 
@@ -114,7 +114,7 @@ class TestGroth(unittest.TestCase):
         M = [groth.comm(random_scalar(),v[i],r[i]) for i in range(N)]
         M[l] = groth.comm(Scalar(0),v[l],r[l])
         proof,state = groth.prove_initial(M,l,v[l],r[l],n,m)
-        state.x = groth.challenge([proof])
+        state.x = groth.challenge(M,[proof])
         proof,gammas = groth.prove_final(proof,state)
         groth.verify(M,proof,n,m,state.x)
 
@@ -128,7 +128,7 @@ class TestGroth(unittest.TestCase):
         M = [groth.comm(random_scalar(),v[i],r[i]) for i in range(N)]
         M[l] = groth.comm(Scalar(0),v[l],r[l])
         proof,state = groth.prove_initial(M,l,v[l],r[l],n,m)
-        state.x = groth.challenge([proof])
+        state.x = groth.challenge(M,[proof])
         proof,gammas = groth.prove_final(proof,state)
         groth.verify(M,proof,n,m,state.x)
 
@@ -142,7 +142,7 @@ class TestGroth(unittest.TestCase):
             M = [groth.comm(random_scalar(),v[i],r[i]) for i in range(N)]
             M[l] = groth.comm(Scalar(0),v[l],r[l])
             proof,state = groth.prove_initial(M,l,v[l],r[l],n,m)
-            state.x = groth.challenge([proof])
+            state.x = groth.challenge(M,[proof])
             proof,gammas = groth.prove_final(proof,state)
             groth.verify(M,proof,n,m,state.x)
 
