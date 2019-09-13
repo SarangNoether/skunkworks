@@ -22,7 +22,7 @@ To examine the size of a spend transaction, assume that `M` inputs are spent wit
 
 Component | Size
 --------- | ----
-Modified Groth proofs | `M[m(n + 2) + 9]`
+Modified Groth proofs | `M[m(n + 1) + 9]`
 Key images | `M`
 Fee | `O(1)`
 Output commitments | `T`
@@ -31,17 +31,17 @@ Output obfuscated values | `T`
 Output obfuscated masks | `T`
 Transaction public key | `T`
 Bulletproof range proof | `2lg(64T) + 10`
-**Total** | `M[m(n + 2) + 10] + 5T + 2lg(64T) + 10 + O(1)`
+**Total** | `M[m(n + 1) + 10] + 5T + 2lg(64T) + 10 + O(1)`
 
-For `N = 128 = 2^7` and `M = T = 2`, a spend transaction is 3.52 kB.
+For `N = 128 = 2^7` and `M = T = 2`, a spend transaction is 3.07 kB.
 
-For `N = 1024 = 2^10` and `M = T = 2`, a spend transaction is 4.29 kB.
+For `N = 1024 = 2^10` and `M = T = 2`, a spend transaction is 3.65 kB.
 
 To examine verification complexity, let `k(i)` be the verification time required for an `i`-multiexponentiation operation. Let `B` be the number of transactions to verify in a batch; that is, set `B = 1` for verification of a single transaction.
 
 Component | Unique generators
 --------- | -----------------
-Modified Groth proofs | `B[N(M + 2) + M(3m + 1)] + mn + 1`
+Modified Groth proofs | `B[M(2m + 2) + 3N] + mn + 1`
 Bulletproof | `B[T + lg(64T) + 4] + 128T`
 
 Note that we only count generators unique to each component when verifying a `B`-batch of `M`-in-`T`-out transactions.
@@ -52,8 +52,8 @@ We illustrate the practical time complexity for several representative parameter
 
 `N` | `M` | `T` | `B` | Time complexity | Time/txn (ms)
 --- | --- | --- | --- | --------------- | -------------
-128 | 2   | 2   | 1   | `k(840)` | 45.0 ms
-128 | 2   | 2   | 128 | `k(73103)` | 23.1 ms
-128 | 16  | 2   | 128 | `k(341903)` | 127 ms
-128 | 2   | 16  | 128 | `k(77071)` | 24.2 ms
-1024 | 2  | 2   | 128 | `k(534165)` | 168 ms
+128 | 2   | 2   | 1   | `k(847)` | 45.3
+128 | 2   | 2   | 128 | `k(73999)` | 23.3
+128 | 16  | 2   | 128 | `k(342799)` | 149
+128 | 2   | 16  | 128 | `k(78351)` | 24.6
+1024 | 2  | 2   | 128 | `k(535061)` | 168
