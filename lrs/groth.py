@@ -9,34 +9,32 @@ H = hash_to_point('H')
 class Proof:
     def __init__(self):
         self.J = None
+        self.K = None
         self.A = None
         self.B = None
         self.C = None
         self.D = None
         self.X = None
         self.Y = None
-        self.Z = None
         self.f = None
         self.zA = None
         self.zC = None
         self.zR = None
-        self.zS = None
 
     def __repr__(self):
         temp = '<GrothProof> '
         temp += 'J:'+repr(self.J)+'|'
+        temp += 'K:'+repr(self.K)+'|'
         temp += 'A:'+repr(self.A)+'|'
         temp += 'B:'+repr(self.B)+'|'
         temp += 'C:'+repr(self.C)+'|'
         temp += 'D:'+repr(self.D)+'|'
         temp += 'X:'+repr(self.G)+'|'
         temp += 'Y:'+repr(self.Q)+'|'
-        temp += 'Z:'+repr(self.Z)+'|'
         temp += 'f:'+repr(self.f)+'|'
         temp += 'zA:'+repr(self.zA)+'|'
         temp += 'zC:'+repr(self.zC)+'|'
-        temp += 'zR:'+repr(self.zR)+'|'
-        temp += 'zS:'+repr(self.zS)
+        temp += 'zR:'+repr(self.zR)
         return temp
 
 # Pedersen vector commitment
@@ -117,8 +115,9 @@ def prove(M,P,l,r,s,m):
         raise IndexError('Bad size decomposition!')
     N = len(M)
 
-    # Construct the tag
+    # Construct the tags
     J = r.invert()*hash_to_point(M[l])
+    K = s*J
 
     # Reconstruct the known commitments
     if not M[l] == r*G:
@@ -173,30 +172,27 @@ def prove(M,P,l,r,s,m):
     # Generate proof values
     X = [dumb25519.Z for _ in range(m)]
     Y = [dumb25519.Z for _ in range(m)]
-    Z = [dumb25519.Z for _ in range(m)]
     rho = [random_scalar() for _ in range(m)]
-    rho_Z = [random_scalar() for _ in range(m)]
+    mu = hash_to_scalar(M,P,J,K) # key aggregation
     for j in range(m):
         for i in range(N):
-            X[j] += M[i]*p[i][j]
-            Y[j] += hash_to_point(M[i])*p[i][j]
-            Z[j] += P[i]*p[i][j]
+            X[j] += (M[i] + mu*P[i])*p[i][j]
+            Y[j] += (hash_to_point(M[i]) + mu*K)*p[i][j]
         X[j] += rho[j]*G
         Y[j] += rho[j]*J
-        Z[j] += rho_Z[j]*G
 
     # Partial proof
     proof = Proof()
     proof.J = J
+    proof.K = K
     proof.A = A
     proof.B = B
     proof.C = C
     proof.D = D
     proof.X = X
     proof.Y = Y
-    proof.Z = Z
 
-    x = hash_to_scalar(M,P,J,A,B,C,D,X,Y,Z)
+    x = hash_to_scalar(M,P,J,K,A,B,C,D,X,Y)
 
     f = [[None for _ in range(n)] for _ in range(m)]
     for j in range(m):
@@ -205,18 +201,15 @@ def prove(M,P,l,r,s,m):
 
     zA = rB*x + rA
     zC = rC*x + rD
-    zR = r*x**m
-    zS = s*x**m
+    zR = (r + mu*s)*x**m
     for j in range(m):
         zR -= rho[j]*x**j
-        zS -= rho_Z[j]*x**j
 
     # Assemble proof
     proof.f = f
     proof.zA = zA
     proof.zC = zC
     proof.zR = zR
-    proof.zS = zS
 
     return proof
 
@@ -234,20 +227,20 @@ def verify(M,P,proof,m):
     N = n**m
 
     J = proof.J
+    K = proof.K
     A = proof.A
     B = proof.B
     C = proof.C
     D = proof.D
     X = proof.X
     Y = proof.Y
-    Z = proof.Z
     f = proof.f
     zA = proof.zA
     zC = proof.zC
     zR = proof.zR
-    zS = proof.zS
 
-    x = hash_to_scalar(M,P,J,A,B,C,D,X,Y,Z)
+    x = hash_to_scalar(M,P,J,K,A,B,C,D,X,Y)
+    mu = hash_to_scalar(M,P,J,K) # key aggregation
 
     for j in range(m):
         f[j][0] = x
@@ -269,20 +262,17 @@ def verify(M,P,proof,m):
     # Commitment check
     R1 = dumb25519.Z
     R2 = dumb25519.Z
-    S = dumb25519.Z
     for i in range(N):
         s = Scalar(1)
         decomp_i = decompose(i,n,m)
         for j in range(m):
             s *= f[j][decomp_i[j]]
-        R1 += M[i]*s
-        R2 += hash_to_point(M[i])*s
-        S += P[i]*s
+        R1 += (M[i] + mu*P[i])*s
+        R2 += (hash_to_point(M[i]) + mu*K)*s
     for j in range(m):
         R1 -= X[j]*x**j
         R2 -= Y[j]*x**j
-        S -= Z[j]*x**j
-    if not R1 == zR*G or not R2 == zR*J or not S == zS*G:
+    if not R1 == zR*G or not R2 == zR*J:
         raise ArithmeticError('Failed commitment check!')
 
     return True
