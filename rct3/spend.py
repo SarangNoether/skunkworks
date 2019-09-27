@@ -1,12 +1,14 @@
 from dumb25519 import *
 from common import *
+from random import sample
 import transcript
 
 # Spend proof
 class SpendProof:
     def __init__(self):
+        self.B1 = None
+        self.B2 = None
         self.A = None
-        self.B = None
         self.S1 = None
         self.S2 = None
         self.S3 = None
@@ -14,15 +16,16 @@ class SpendProof:
         self.T2 = None
         self.tau_x = None
         self.mu = None
-        self.z_a = None
-        self.z_sk = None
+        self.z_a1 = None
+        self.z_a2 = None
+        self.z_sk = None # list
         self.z_d = None
-        self.L = None
-        self.R = None
+        self.L = None # list
+        self.R = None # list
         self.a = None
         self.b = None
         self.t = None
-        self.U1 = None
+        self.U = None # list (key images)
         self.P = None
 
 # Data for a round of the inner product argument
@@ -73,101 +76,134 @@ def inner_product(data):
     data.a = data.a[:n]*x + data.a[n:]*x.invert()
     data.b = data.b[:n]*x.invert() + data.b[n:]*x
 
-# Generate a spend proof
+# Generate a spend proof for multiple inputs
 #
 # INPUTS
-#   pk: list of public keys (Points)
-#   C_in: list of corresponding input commitments (Points)
-#   k: signing index (int)
-#   a: input amount (Scalar)
-#   kappa: input mask (Scalar)
-#   delta: input offset (Scalar)
-#   sk: secret key (Scalar)
+#   pk: list of public keys (Point list)
+#   C_in: list of input commitments (Point list)
+#   k: signing indices (int list)
+#   a: input amounts (Scalar list)
+#   kappa: input masks (Scalar list)
+#   sk: secret keys (Scalar list)
+#   delta: difference of input and output masks (Scalar)
 # OUTPUTS
 #   proof: spend proof
-def prove(pk,C_in,k,a,kappa,delta,sk):
+def prove(pk,C_in,k,a,kappa,sk,delta):
+    M = len(k) # number of spends
+
     # Sanity checks
     if not len(pk) == RING or not len(C_in) == RING:
         raise IndexError('Bad input ring size!')
     if not power2(RING):
         raise IndexError('Bad input ring size!')
+    if not len(a) == M or not len(kappa) == M or not len(sk) == M:
+        raise IndexError('Bad spend data size!')
+    for j in range(M):
+        if not sk[j]*G == pk[k[j]]:
+            raise ValueError('Bad secret key!')
+        if not com(a[j],kappa[j]) == C_in[k[j]]:
+            raise ValueError('Bad input commitment data!')
+    if not power2(M*RING):
+        raise ValueError('Product of inputs and ring size must be a power of 2!')
 
     # Begin transcript
     tr = transcript.Transcript('RCT3 spend')
 
-    # Key image
-    U1 = sk.invert()*U
+    # Generators
+    Gi = PointVector([])
+    Hi = PointVector([])
+    for i in range(RING):
+        Gi.append(hash_to_point('Gi',i))
+    for i in range(M*RING):
+        Hi.append(hash_to_point('Hi',i))
 
-    # Offset commitment
-    C1 = C_in[k] - delta*Gc # offset commitment
+    # Key images
+    Ui = []
+    for j in range(M):
+        Ui.append(sk[j].invert()*U)
 
     # Construct ring
     Y = PointVector([])
     tr.update(pk)
     tr.update(C_in)
-    tr.update(C1)
+    d0 = tr.challenge()
     d1 = tr.challenge()
     d2 = tr.challenge()
-    for i in range(RING):
-        Y.append(pk[i] + d1*(C_in[i]-C1) + d2*G0)
+    for j in range(M):
+        for i in range(RING):
+            Y.append(d0**j*pk[i] + d1*C_in[i] + d2*Gi[i])
 
-    # Confirm true spend
-    if not Y[k] == sk*G + (d1*delta)*Gc + d2*G0:
-        raise ValueError('Invalid signer public key!')
-
-    # Prepare signer index
-    bL = ScalarVector([Scalar(0)]*RING)
-    bL[k] = Scalar(1)
+    # Prepare signer indices
+    bL = ScalarVector([Scalar(0)]*(M*RING))
+    for j in range(M):
+        bL[j*RING+k[j]] = Scalar(1)
     bR = ScalarVector([])
-    for i in range(RING):
+    for i in range(M*RING):
         bR.append(bL[i] - Scalar(1))
 
     # Point generation
     H = hash_to_point(tr.challenge())
-    alpha = random_scalar()
+    alpha1 = random_scalar()
+    alpha2 = random_scalar()
     beta = random_scalar()
     p = random_scalar()
-    r_a = random_scalar()
-    r_sk = random_scalar()
+    r_a1 = random_scalar()
+    r_a2 = random_scalar()
+    r_sk = [random_scalar() for _ in range(M)]
     r_d = random_scalar()
-    sL = ScalarVector([])
-    sR = ScalarVector([])
-    for i in range(RING):
-        sL.append(random_scalar())
-        sR.append(random_scalar())
+    sL = ScalarVector([random_scalar() for _ in range(M*RING)])
+    sR = ScalarVector([random_scalar() for _ in range(M*RING)])
 
     # Commit 1
-    B = alpha*H
+    B1 = alpha1*H
+    B2 = alpha2*H
     A = beta*H
-    for i in range(RING):
-        B += bL[i]*Y[i]
+    for j in range(M):
+        B1 += d0**j*pk[k[j]] + d1*C_in[k[j]] + d2*Gi[k[j]]
+        B2 += Gi[k[j]]
+    for i in range(M*RING):
         A += bR[i]*Hi[i]
-    S1 = r_a*H + r_sk*G + (d1*r_d)*Gc
+
+    S1 = (r_a1-d2*r_a2)*H + (d1*r_d)*Gc
+    temp = Scalar(0)
+    for j in range(M):
+        temp += r_sk[j]*d0**j
+    S1 += temp*G
+
     S2 = p*H
-    for i in range(RING):
+    for i in range(M*RING):
         S2 += sL[i]*Y[i] + sR[i]*Hi[i]
-    S3 = r_sk*U1
+
+    S3 = Z
+    for j in range(M):
+        S3 += r_sk[j]*d0**j*Ui[j]
 
     # Challenge 1
-    tr.update(B)
+    tr.update(B1)
+    tr.update(B2)
     tr.update(A)
     tr.update(S1)
     tr.update(S2)
     tr.update(S3)
-    tr.update(U1)
+    for j in range(M):
+        tr.update(Ui[j])
     y = tr.challenge()
-    y_inv = y.invert()
     z = tr.challenge()
     w = tr.challenge()
 
     # Commit 2
-    vec_1 = ScalarVector([Scalar(1)]*RING)
-
-    l0 = bL - ScalarVector([z]*RING)
+    l0 = bL - ScalarVector([z]*(M*RING))
     l1 = sL
 
-    vec_y = ScalarVector([y**i for i in range(RING)])
-    r0 = vec_y*(bR*w + ScalarVector([w*z]*RING)) + ScalarVector([z**2]*RING)
+    vec_1 = ScalarVector([Scalar(1) for _ in range(M*RING)])
+    vec_y = ScalarVector([y**i for i in range(M*RING)])
+
+    r0 = vec_y*(bR*w + ScalarVector([w*z]*(M*RING)))
+    vec_z = ScalarVector([])
+    for j in range(M):
+        for i in range(RING):
+            vec_z.append(z**(2+j))
+    r0 += vec_z
     r1 = vec_y*sR
 
     t1 = l0**r1 + l1**r0
@@ -186,23 +222,30 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
     l = l0 + l1*x
     r = r0 + r1*x
     t = l**r
+
     tau_x = tau1*x + tau2*(x**2)
-    mu = alpha + beta*w + p*x
-    z_a = r_a + alpha*x
-    z_sk = r_sk + sk*x
+    mu = alpha1 + beta*w + p*x
+    z_a1 = r_a1 + alpha1*x
+    z_a2 = r_a2 + alpha2*x
+    z_sk = []
+    for j in range(M):
+        z_sk.append(r_sk[j] + sk[j]*x)
     z_d = r_d + delta*x
 
     # P computation (TODO: not needed later)
     P = Z
-    for i in range(RING):
+    y_inv = y.invert()
+    for i in range(M*RING):
         P += l[i]*Y[i] + (y_inv**i*r[i])*Hi[i]
 
     # Inner product compression
     tr.update(tau_x)
     tr.update(mu)
     tr.update(t)
-    tr.update(z_a)
-    tr.update(z_sk)
+    tr.update(z_a1)
+    tr.update(z_a2)
+    for j in range(M):
+        tr.update(z_sk[j])
     tr.update(z_d)
     x_ip = tr.challenge()
 
@@ -214,8 +257,9 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
 
     # Construct proof
     proof = SpendProof()
+    proof.B1 = B1
+    proof.B2 = B2
     proof.A = A
-    proof.B = B
     proof.S1 = S1
     proof.S2 = S2
     proof.S3 = S3
@@ -223,7 +267,8 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
     proof.T2 = T2
     proof.tau_x = tau_x
     proof.mu = mu
-    proof.z_a = z_a
+    proof.z_a1 = z_a1
+    proof.z_a2 = z_a2
     proof.z_sk = z_sk
     proof.z_d = z_d
     proof.L = data.L
@@ -231,7 +276,7 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
     proof.a = data.a
     proof.b = data.b
     proof.t = t
-    proof.U1 = U1
+    proof.U = Ui
     proof.P = P
     return proof
 
@@ -239,28 +284,39 @@ def prove(pk,C_in,k,a,kappa,delta,sk):
 #
 # INPUTS
 #   proof: spend proof (SpendProof)
-#   pk: list of public keys (Points)
-#   C_in: list of corresponding input commitments (Points)
-#   C1: commitment offset (Point)
-def verify(proof,pk,C_in,C1):
+#   pk: list of public keys (Point list)
+#   C_in: list of input commitments (Point list)
+#   C_out: list of output commitments (Point list)
+def verify(proof,pk,C_in,C_out):
     # Begin transcript
     tr = transcript.Transcript('RCT3 spend')
+
+    M = len(proof.U) # number of spends
+
+    # Generators
+    Gi = PointVector([])
+    Hi = PointVector([])
+    for i in range(RING):
+        Gi.append(hash_to_point('Gi',i))
+    for i in range(M*RING):
+        Hi.append(hash_to_point('Hi',i))
 
     # Construct challenges
     tr.update(pk)
     tr.update(C_in)
-    tr.update(C1)
+    d0 = tr.challenge()
     d1 = tr.challenge()
     d2 = tr.challenge()
     H = hash_to_point(tr.challenge())
-    tr.update(proof.B)
+    tr.update(proof.B1)
+    tr.update(proof.B2)
     tr.update(proof.A)
     tr.update(proof.S1)
     tr.update(proof.S2)
     tr.update(proof.S3)
-    tr.update(proof.U1)
+    for j in range(M):
+        tr.update(proof.U[j])
     y = tr.challenge()
-    y_inv = y.invert()
     z = tr.challenge()
     w = tr.challenge()
     tr.update(proof.T1)
@@ -269,14 +325,16 @@ def verify(proof,pk,C_in,C1):
     tr.update(proof.tau_x)
     tr.update(proof.mu)
     tr.update(proof.t)
-    tr.update(proof.z_a)
-    tr.update(proof.z_sk)
+    tr.update(proof.z_a1)
+    tr.update(proof.z_a2)
+    for j in range(M):
+        tr.update(proof.z_sk[j])
     tr.update(proof.z_d)
     x_ip = tr.challenge()
 
     # Useful vectors
-    vec_1 = ScalarVector([Scalar(1)]*RING)
-    vec_y = ScalarVector([y**i for i in range(RING)])
+    vec_1 = ScalarVector([Scalar(1)]*(M*RING))
+    vec_y = ScalarVector([y**i for i in range(M*RING)])
 
     # Generate nonzero random weights (indexed by equation number)
     w1 = Scalar(0)
@@ -307,8 +365,9 @@ def verify(proof,pk,C_in,C1):
         if W[i] == Scalar(0):
             raise ArithmeticError
     W_inv = W.invert()
+    y_inv = y.invert()
 
-    for i in range(RING):
+    for i in range(M*RING):
         index = i
         g = proof.a
         h = proof.b*((y_inv)**i)
@@ -323,9 +382,9 @@ def verify(proof,pk,C_in,C1):
                 h *= W_inv[J]
                 index -= base_power
 
-        data.append([pk[i],g])
-        data.append([C_in[i]-C1,g*d1])
-        data.append([G0,g*d2])
+        data.append([pk[i%RING],g*d0**(i/RING)])
+        data.append([C_in[i%RING],g*d1])
+        data.append([Gi[i%RING],g*d2])
         data.append([Hi[i],h])
 
     data.append([G_ip,x_ip*(proof.a*proof.b-proof.t)])
@@ -340,7 +399,11 @@ def verify(proof,pk,C_in,C1):
     # Check 2
     data = []
     data.append([H,-proof.tau_x])
-    data.append([G,z**2 + w*(z-z**2)*(vec_1**vec_y) - z**3*(vec_1**vec_1) - proof.t])
+    temp = Scalar(0)
+    for j in range(M):
+        temp += z**(2+j)
+    temp *= Scalar(1)-Scalar(RING)*z
+    data.append([G,temp + w*(z-z**2)*(vec_1**vec_y) - proof.t])
     data.append([proof.T1,x])
     data.append([proof.T2,x**2])
     for i in range(len(data)):
@@ -351,38 +414,95 @@ def verify(proof,pk,C_in,C1):
     data = []
     data.append([H,-proof.mu])
     data.append([proof.P,-Scalar(1)])
-    data.append([proof.B,Scalar(1)])
+    data.append([proof.B1,Scalar(1)])
     data.append([proof.A,w])
     data.append([proof.S2,x])
-    data.append([G0,-Scalar(RING)*z*d2])
-    for i in range(RING):
-        data.append([pk[i],-z])
-        data.append([C1-C_in[i],z*d1])
-        data.append([Hi[i],(w*z*y**i + z**2)*(y_inv**i)])
+
+    vec_z = ScalarVector([])
+    for j in range(M):
+        for i in range(RING):
+            vec_z.append(z**(2+j))
+
+    for i in range(M*RING):
+        data.append([pk[i%RING],-z*d0**(i/RING)])
+        data.append([C_in[i%RING],-z*d1])
+        data.append([Gi[i%RING],-z*d2])
+        data.append([Hi[i],(w*z*y**i + vec_z[i])*(y_inv**i)])
     for i in range(len(data)):
         data[i][1] *= w3
     check.extend(data)
 
     # Check 4
     data = []
-    data.append([H,proof.z_a])
-    data.append([G,proof.z_sk])
+    data.append([H,proof.z_a1 - d2*proof.z_a2])
+    temp = Scalar(0)
+    for j in range(M):
+        temp += proof.z_sk[j]*d0**j
+    data.append([G,temp])
     data.append([Gc,d1*proof.z_d])
     data.append([proof.S1,-Scalar(1)])
-    data.append([proof.B,-x])
-    data.append([G0,d2*x])
+    data.append([proof.B1,-x])
+    data.append([proof.B2,x*d2])
+    for j in range(len(C_out)):
+        data.append([C_out[j],x*d1])
     for i in range(len(data)):
         data[i][1] *= w4
     check.extend(data)
 
     # Check 5
     data = []
-    data.append([proof.U1,proof.z_sk])
+    for j in range(M):
+        data.append([proof.U[j],proof.z_sk[j]*d0**j])
     data.append([proof.S3,-Scalar(1)])
-    data.append([U,-x])
+    temp = Scalar(0)
+    for j in range(M):
+        temp += d0**j
+    data.append([U,-x*temp])
     for i in range(len(data)):
         data[i][1] *= w5
     check.extend(data)
 
     if not multiexp(check) == Z:
         raise ArithmeticError('Failed verification!')
+
+# NOTE: debug only
+M = 2
+RING = 8 # overrides common.py
+k = sample(range(RING),M) # spend indices
+N = 3 # number of outputs
+
+# Output keys
+P = [random_point() for _ in range(RING)]
+p = [random_scalar() for _ in range(M)]
+
+# Commitment keys
+C_in = [random_point() for _ in range(RING)]
+v_in = [random_scalar() for _ in range(M)]
+m_in = [random_scalar() for _ in range(M)]
+
+# Construct public keys from private keys
+for i in range(M):
+    P[k[i]] = p[i]*G
+    C_in[k[i]] = com(v_in[i],m_in[i])
+
+# Output commitments
+C_out = []
+v_out = [random_scalar() for _ in range(N)]
+m_out = [random_scalar() for _ in range(N)]
+v_out[-1] = Scalar(0)
+delta = Scalar(0)
+for i in range(M):
+    v_out[-1] += v_in[i]
+    delta += m_in[i]
+for i in range(N-1):
+    v_out[-1] -= v_out[i]
+    delta -= m_out[i]
+    C_out.append(com(v_out[i],m_out[i]))
+delta -= m_out[-1]
+C_out.append(com(v_out[-1],m_out[-1]))
+
+print 'Proving...'
+proof = prove(P,C_in,k,v_in,m_in,p,delta)
+print 'Verifying...'
+verify(proof,P,C_in,C_out)
+print 'Passed!'
