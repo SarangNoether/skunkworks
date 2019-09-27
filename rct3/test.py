@@ -119,7 +119,7 @@ class MintTransaction:
 
 # The result of a spend transaction
 class SpendTransaction:
-    # Spend a coin
+    # Spend coins
     #
     # INPUTS
     #   coins: list of coins (spends and decoys)
@@ -130,11 +130,8 @@ class SpendTransaction:
     # DATA
     #   coins_in: input coins
     #   coins_out: output coins
-    #   C1: commitment offsets
     #   range_proof: aggregate range proof
-    #   spend_proofs: spend proofs
-    #   bal_c: balance proof c
-    #   bal_z: balance proof z
+    #   spend_proof: aggregate spend proof
     #   f: fee
     def __init__(self,coins_in,l,dest,v,f):
         # Sanity checks
@@ -158,52 +155,26 @@ class SpendTransaction:
         # Generate range proof
         range_proof = pybullet.prove([[v[i],coins_out[i].mask] for i in range(len(dest))],BITS)
 
-        # Offset input coins
-        delta = []
-        C1 = []
-        for i in range(len(l)):
-            delta.append(random_scalar())
-            C1.append(coins_in[l[i]].C - delta[i]*Gc)
-
-        # Generate balance proof
+        # Generate balance proof secret, accounting for fee
         d = Scalar(0)
+        for i in range(len(l)):
+            d += coins_in[l[i]].mask
         for i in range(len(coins_out)):
-            d += coins_out[i].mask
-        for i in range(len(l)):
-            d -= (coins_in[l[i]].mask - delta[i])
-        r1 = random_scalar()
-        bal_c = hash_to_scalar(r1*Gc,coins_out,coins_in,f)
-        bal_z = r1 + d*bal_c
+            d -= coins_out[i].mask
 
-        # Generate spend proofs
-        spend_proofs = []
-        for i in range(len(l)):
-            spend_proofs.append(spend.prove([coin.P for coin in coins_in],[coin.C for coin in coins_in],l[i],coins_in[l[i]].v,coins_in[l[i]].mask,delta[i],coins_in[l[i]].p))
+        # Generate spend proof
+        spend_proof = spend.prove([coin.P for coin in coins_in],[coin.C for coin in coins_in],l,[coins_in[l[i]].v for i in range(len(l))],[coins_in[l[i]].mask for i in range(len(l))],[coins_in[l[i]].p for i in range(len(l))],d)
 
         self.coins_in = coins_in
         self.coins_out = coins_out
-        self.C1 = C1
         self.range_proof = range_proof
-        self.spend_proofs = spend_proofs
-        self.bal_c = bal_c
-        self.bal_z = bal_z
+        self.spend_proof = spend_proof
         self.f = f
 
     # Verify the spend operation
     def verify(self):
-        # Verify balance proof
-        R = self.bal_z*Gc
-        for i in range(len(self.coins_out)):
-            R -= self.bal_c*self.coins_out[i].C
-        R -= self.bal_c*self.f*Hc # account for fee
-        for i in range(len(self.C1)):
-            R += self.bal_c*self.C1[i]
-        if not hash_to_scalar(R,self.coins_out,self.coins_in,self.f) == self.bal_c:
-            raise ArithmeticError('Bad balance proof!')
-
-        # Verify spend proofs
-        for i in range(len(self.spend_proofs)):
-            spend.verify(self.spend_proofs[i],[coin.P for coin in self.coins_in],[coin.C for coin in self.coins_in],self.C1[i])
+        # Verify spend proof
+        spend.verify(self.spend_proof,[coin.P for coin in self.coins_in],[coin.C for coin in self.coins_in],[coin.C for coin in self.coins_out]+[com(self.f,Scalar(0))])
 
         # Verify range proof
         pybullet.verify([self.range_proof],BITS)

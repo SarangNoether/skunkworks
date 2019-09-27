@@ -4,6 +4,7 @@ from dumb25519 import *
 
 # Protocol constants
 BITS = 4 # range bit length
+RING = 4 # anonymity set size
 
 # Fixed generators
 Gc = hash_to_point('Gc') # commitment generator
@@ -13,10 +14,10 @@ G_ip = hash_to_point('G_ip')
 
 # Pedersen commitment
 # INPUT
-#   v: value
-#   a: mask
-def com(v,a):
-    return v*Hc + a*Gc
+#   a: amount
+#   m: mask
+def com(a,m):
+    return a*Hc + m*Gc
 
 # Determine if a value is a power of 2
 #
