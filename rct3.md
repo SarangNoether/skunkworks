@@ -46,7 +46,7 @@ Spend proof | `B[2N + 2lg(MN) + M + T + 9] + (M + 1)N + 5`
 
 Note that we only count generators unique to each batchable component when verifying a `B`-batch of `M`-in-`T`-out transactions.
 
-Because the verifier can form a single weighted multiexponentiation operation across all proofs and transactoins, the above table has total batch time complexity `k(X)`, where `X` is the sum of all unique generators listed.
+Because the verifier can form a single weighted multiexponentiation operation across all proofs and transactions, the above table has total batch time complexity `k(X)`, where `X` is the sum of all unique generators listed.
 
 We illustrate the practical time complexity for several representative parameters, and give the corresponding timing estimates from Monero performance test code.
 
