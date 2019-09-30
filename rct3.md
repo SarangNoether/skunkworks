@@ -23,7 +23,7 @@ To examine the size of a spend transaction, assume that `M` inputs are spent wit
 
 Component | Size
 --------- | ----
-Spend proof | `2lg(MN) + 2M + 17]`
+Spend proof | `2lg(MN) + 2M + 17`
 Input key images | `M`
 Bulletproof range proof | `2lg(64T) + 10`
 Output commitments | `T`
