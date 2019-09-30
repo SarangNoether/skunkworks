@@ -15,7 +15,7 @@ Important assumptions and notes:
 
 A spend transaction consumes outputs and generates new outputs. Such a transaction reveals neither which outputs are consumed nor the value of the outputs. Similarly to Monero transactions, the anonymity set for spends must be specified, though multiple spends within the transaction may share an anonymity set for improved efficiency.
 
-Spend transactions contain a Bulletproof-style proof for each spend demonstrating knowledge of one of the private keys corresponding to an output in the anonymity set, as well as showing the correctness of the construction of a key image used for detecting double spend attempts. Output public keys are generated using Diffie-Hellman exchanges with recipients, and a single Bulletproof aggregate range proof is generated for all outputs. Balance is shown using a Schnorr proof of discrete logarithm knowledge.
+Spend transactions contain a single Bulletproof-style proof for all spends demonstrating knowledge of one of the private keys corresponding to an output in the anonymity set for each spend, transaction balance, and the correctness of the construction of key images used for detecting double spend attempts. Output public keys are generated using Diffie-Hellman exchanges with recipients, and a single Bulletproof aggregate range proof is generated for all outputs.
 
 Note that our notation for size and time estimates differs from that of the paper, in order to match existing notation elsewhere.
 
@@ -23,39 +23,37 @@ To examine the size of a spend transaction, assume that `M` inputs are spent wit
 
 Component | Size
 --------- | ----
-Spend proofs | `M[2lg(N) + 16]`
-Input coin offsets | `M`
+Spend proof | `2lg(MN) + 2M + 17]`
 Input key images | `M`
 Bulletproof range proof | `2lg(64T) + 10`
 Output commitments | `T`
 Output public keys | `T`
 Output obfuscated amounts | `T`
 Output transaction public keys | `T`
-Schnorr balance proof | `2`
 Fee | `O(1)`
-**Total** | `2Mlg(N) + 2lg(64T) + 17M + 4T + 12 + O(1)`
+**Total** | `2lg(MN) + 2lg(64T) + 3M + 4T + 27 + O(1)`
 
-For `N = 128` and `M = T = 2`, a spend transaction is 3.07 kB.
+For `N = 128` and `M = T = 2`, a spend transaction is 2.27 kB.
 
-For `N = 1024` and `M = T = 2`, a spend transaction is 3.46 kB.
+For `N = 1024` and `M = T = 2`, a spend transaction is 2.46 kB.
 
 To examine verification complexity, let `k(i)` be the verification time required for an `i`-multiexponentiation operation. Let `B` be the number of transactions to verify in a batch; that is, set `B = 1` for verification of a single transaction.
 
 Component | Unique generators
 --------- | -----------------
 Bulletproof | `B[T + 2lg(64T) + 4] + 128T`
-Spend proofs | `B(8M + 2N) + N + 5`
+Spend proof | `B[2N + 2lg(MN) + M + T + 9] + (M + 1)N + 5`
 
 Note that we only count generators unique to each batchable component when verifying a `B`-batch of `M`-in-`T`-out transactions.
 
-Because the verifier can form a single weighted multiexponentiation operation across all proofs and transactoins, the above table has total batch time complexity `k(X)`, where `X` is the sum of all unique generators listed. Further, each of the `B` transaction balance proofs in the batch takes time complexity `k(T + M + 2)` (accounting for an additional fee output commitment not included in the original proof description).
+Because the verifier can form a single weighted multiexponentiation operation across all proofs and transactoins, the above table has total batch time complexity `k(X)`, where `X` is the sum of all unique generators listed.
 
 We illustrate the practical time complexity for several representative parameters, and give the corresponding timing estimates from Monero performance test code.
 
 `N` | `M` | `T` | `B` | Time complexity | Time/txn (ms)
 --- | --- | --- | --- | --------------- | -------------
-128 |   2 |   2 |   1 | `k(681) + k(6)` | 38.8
-128 |   2 |   2 | 128 | `k(37765) + 128k(6)` | 12.8
-128 |  16 |   2 | 128 | `k(52101) + 128k(6)` | 17.3
-128 |   2 |  16 | 128 | `k(42117) + 128k(6)` | 14.0
-1024 |  2 |   2 | 128 | `k(268037) + 128k(6)` | 84.4
+128 |   2 |   2 |   1 | `k(950)` | 49.9
+128 |   2 |   2 | 128 | `k(39685)` | 12.5
+128 |  16 |   2 | 128 | `k(44037)` | 13.7
+128 |   2 |  16 | 128 | `k(45829)` | 14.3
+1024 |  2 |   2 | 128 | `k(272517)` | 84.7
