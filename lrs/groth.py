@@ -1,5 +1,7 @@
 # Proof-of-concept implementation of https://github.com/monero-project/research-lab/issues/56
 
+# This version proves knowledge of one or more commitments to zero in a list
+
 from dumb25519 import hash_to_point, random_scalar, Scalar, hash_to_scalar, G, random_point
 import dumb25519
 
@@ -8,14 +10,11 @@ H = hash_to_point('H')
 # Proof structure
 class Proof:
     def __init__(self):
-        self.J = None
-        self.K = None
         self.A = None
         self.B = None
         self.C = None
         self.D = None
         self.X = None
-        self.Y = None
         self.f = None
         self.zA = None
         self.zC = None
@@ -23,14 +22,11 @@ class Proof:
 
     def __repr__(self):
         temp = '<GrothProof> '
-        temp += 'J:'+repr(self.J)+'|'
-        temp += 'K:'+repr(self.K)+'|'
         temp += 'A:'+repr(self.A)+'|'
         temp += 'B:'+repr(self.B)+'|'
         temp += 'C:'+repr(self.C)+'|'
         temp += 'D:'+repr(self.D)+'|'
-        temp += 'X:'+repr(self.G)+'|'
-        temp += 'Y:'+repr(self.Q)+'|'
+        temp += 'X:'+repr(self.X)+'|'
         temp += 'f:'+repr(self.f)+'|'
         temp += 'zA:'+repr(self.zA)+'|'
         temp += 'zC:'+repr(self.zC)+'|'
@@ -96,112 +92,131 @@ def convolve(x,y,size=None):
 
     return r
 
-# Perform a double-base commitment-to-zero proof
+# Perform a multi-index commitment-to-zero proof
 #
 # INPUT
 #  M: public key list
-#  P: value commitment list
-#  l: index such that M[l], C[l] are commitments to zero
-#  r: Pedersen blinder for M[l]
-#  s: Pedersen blinder for C[l]
-#  m: dimension such that len(M) == len(C) == 2**m
+#  l: list of indices such that each M[l[i]] is a commitment to zero
+#  r: list of Pedersen blinders for all M[l[i]]
+#  m: dimension such that len(M) == 2**m
 # RETURNS
 #  proof structure
-def prove(M,P,l,r,s,m):
+def prove(M,l,r,m):
     n = 2 # binary decomposition
 
     # Size check
-    if not len(M) == n**m or not len(P) == n**m:
+    if not len(M) == n**m:
         raise IndexError('Bad size decomposition!')
     N = len(M)
 
-    # Construct the tags
-    J = r.invert()*hash_to_point(M[l])
-    K = s*J
-
     # Reconstruct the known commitments
-    if not M[l] == r*G:
-        raise ValueError('Bad known public key!')
-    if not P[l] == s*G:
-        raise ValueError('Bad known value commitment!')
+    if not len(l) == len(r):
+        raise IndexError('Index/blinder size mismatch!')
 
-    rA = random_scalar()
-    rB = random_scalar()
-    rC = random_scalar()
-    rD = random_scalar()
+    w = len(l)
+    for i in range(w):
+        if not M[l[i]] == r[i]*G:
+            raise ValueError('Bad commitment blinder!')
+
+
+    rA = [random_scalar() for _ in range(w)]
+    rB = [random_scalar() for _ in range(w)]
+    rC = [random_scalar() for _ in range(w)]
+    rD = [random_scalar() for _ in range(w)]
+
+    A = []
+    B = []
+    C = []
+    D = []
 
     # Commit to zero-sum blinders
-    a = [[random_scalar() for _ in range(n)] for _ in range(m)]
+    a = [[[random_scalar() for _ in range(n)] for _ in range(m)] for _ in range(w)]
     for j in range(m):
-        a[j][0] = Scalar(0)
+        for u in range(w):
+            a[u][j][0] = Scalar(0)
         for i in range(1,n):
-            a[j][0] -= a[j][i]
-    A = com_matrix(a,rA)
+            for u in range(w):
+                a[u][j][0] -= a[u][j][i]
+    for u in range(w):
+        A.append(com_matrix(a[u],rA[u]))
 
     # Commit to decomposition bits
-    decomp_l = decompose(l,n,m)
-    sigma = [[None for _ in range(n)] for _ in range(m)]
+    decomp_l = []
+    for u in range(w):
+        decomp_l.append(decompose(l[u],n,m))
+    sigma = [[[None for _ in range(n)] for _ in range(m)] for _ in range(w)]
     for j in range(m):
         for i in range(n):
-            sigma[j][i] = delta(decomp_l[j],i)
-    B = com_matrix(sigma,rB)
+            for u in range(w):
+                sigma[u][j][i] = delta(decomp_l[u][j],i)
+    for u in range(w):
+        B.append(com_matrix(sigma[u],rB[u]))
 
     # Commit to a/sigma relationships
-    a_sigma = [[Scalar(0) for _ in range(n)] for _ in range(m)]
+    a_sigma = [[[Scalar(0) for _ in range(n)] for _ in range(m)] for _ in range(w)]
     for j in range(m):
         for i in range(n):
-            a_sigma[j][i] = a[j][i]*(Scalar(1) - Scalar(2)*sigma[j][i])
-    C = com_matrix(a_sigma,rC)
+            for u in range(w):
+                a_sigma[u][j][i] = a[u][j][i]*(Scalar(1) - Scalar(2)*sigma[u][j][i])
+    for u in range(w):
+        C.append(com_matrix(a_sigma[u],rC[u]))
     
     # Commit to squared a-values
-    a_sq = [[Scalar(0) for _ in range(n)] for _ in range(m)]
+    a_sq = [[[Scalar(0) for _ in range(n)] for _ in range(m)] for _ in range(w)]
     for j in range(m):
         for i in range(n):
-            a_sq[j][i] = -a[j][i]*a[j][i]
-    D = com_matrix(a_sq,rD)
+            for u in range(w):
+                a_sq[u][j][i] = -a[u][j][i]**2
+    for u in range(w):
+        D.append(com_matrix(a_sq[u],rD[u]))
 
     # Compute p coefficients
-    p = [[Scalar(0) for _ in range(m)] for _ in range(N)]
+    p = [[[Scalar(0) for _ in range(m)] for _ in range(N)] for _ in range(w)]
     for k in range(N):
         decomp_k = decompose(k,n,m)
-        p[k] = [a[0][decomp_k[0]],delta(decomp_l[0],decomp_k[0])]
+        for u in range(w):
+            p[u][k] = [a[u][0][decomp_k[0]],delta(decomp_l[u][0],decomp_k[0])]
         
         for j in range(1,m):
-            p[k] = convolve(p[k],[a[j][decomp_k[j]],delta(decomp_l[j],decomp_k[j])],m)
+            for u in range(w):
+                p[u][k] = convolve(p[u][k],[a[u][j][decomp_k[j]],delta(decomp_l[u][j],decomp_k[j])],m)
+
+        # Combine to single coefficients in p[0]
+        for j in range(m):
+            for u in range(1,w):
+                p[0][k][j] += p[u][k][j]
 
     # Generate proof values
     X = [dumb25519.Z for _ in range(m)]
-    Y = [dumb25519.Z for _ in range(m)]
     rho = [random_scalar() for _ in range(m)]
-    mu = hash_to_scalar(M,P,J,K) # key aggregation
     for j in range(m):
         for i in range(N):
-            X[j] += (M[i] + mu*P[i])*p[i][j]
-            Y[j] += (hash_to_point(M[i]) + mu*K)*p[i][j]
+            X[j] += M[i]*p[0][i][j]
         X[j] += rho[j]*G
-        Y[j] += rho[j]*J
 
     # Partial proof
     proof = Proof()
-    proof.J = J
-    proof.K = K
     proof.A = A
     proof.B = B
     proof.C = C
     proof.D = D
     proof.X = X
-    proof.Y = Y
 
-    x = hash_to_scalar(M,P,J,K,A,B,C,D,X,Y)
+    x = hash_to_scalar(M,A,B,C,D,X)
 
-    f = [[None for _ in range(n)] for _ in range(m)]
+    f = [[[None for _ in range(n)] for _ in range(m)] for _ in range(w)]
     for j in range(m):
         for i in range(1,n):
-            f[j][i] = sigma[j][i]*x + a[j][i]
+            for u in range(w):
+                f[u][j][i] = sigma[u][j][i]*x + a[u][j][i]
 
-    zA = rB*x + rA
-    zC = rC*x + rD
-    zR = (r + mu*s)*x**m
+    zA = []
+    zC = []
+    zR = Scalar(0)
+    for u in range(w):
+        zA.append(rB[u]*x + rA[u])
+        zC.append(rC[u]*x + rD[u])
+        zR += r[u]*x**m
     for j in range(m):
         zR -= rho[j]*x**j
 
@@ -217,77 +232,75 @@ def prove(M,P,l,r,s,m):
 #
 # INPUT
 #  M: public key list
-#  P: value commitment list
 #  proof: proof structure
-#  m: dimension such that len(M) == len(C) == 2**m
+#  m: dimension such that len(M) == 2**m
 # RETURNS
 #  True if the proof is valid
-def verify(M,P,proof,m):
+def verify(M,proof,m):
     n = 2
     N = n**m
 
-    J = proof.J
-    K = proof.K
     A = proof.A
     B = proof.B
     C = proof.C
     D = proof.D
     X = proof.X
-    Y = proof.Y
     f = proof.f
     zA = proof.zA
     zC = proof.zC
     zR = proof.zR
 
-    x = hash_to_scalar(M,P,J,K,A,B,C,D,X,Y)
-    mu = hash_to_scalar(M,P,J,K) # key aggregation
+    x = hash_to_scalar(M,A,B,C,D,X)
+    w = len(A)
 
     for j in range(m):
-        f[j][0] = x
+        for u in range(w):
+            f[u][j][0] = x
         for i in range(1,n):
-            f[j][0] -= f[j][i]
+            for u in range(w):
+                f[u][j][0] -= f[u][j][i]
 
     # A/B check
-    if not com_matrix(f,zA) == B*x + A:
-        raise ArithmeticError('Failed A/B check!')
+    for u in range(w):
+        if not com_matrix(f[u],zA[u]) == B[u]*x + A[u]:
+            raise ArithmeticError('Failed A/B check!')
 
     # C/D check
-    fx = [[None for _ in range(n)] for _ in range(m)]
+    fx = [[[None for _ in range(n)] for _ in range(m)] for _ in range(w)]
     for j in range(m):
         for i in range(n):
-            fx[j][i] = f[j][i]*(x-f[j][i])
-    if not com_matrix(fx,zC) == C*x + D:
-        raise ArithmeticError('Failed C/D check!')
+            for u in range(w):
+                fx[u][j][i] = f[u][j][i]*(x-f[u][j][i])
+    for u in range(w):
+        if not com_matrix(fx[u],zC[u]) == C[u]*x + D[u]:
+            raise ArithmeticError('Failed C/D check!')
 
     # Commitment check
-    R1 = dumb25519.Z
-    R2 = dumb25519.Z
+    R = dumb25519.Z
     for i in range(N):
-        s = Scalar(1)
+        s = [Scalar(1) for _ in range(w)]
         decomp_i = decompose(i,n,m)
         for j in range(m):
-            s *= f[j][decomp_i[j]]
-        R1 += (M[i] + mu*P[i])*s
-        R2 += (hash_to_point(M[i]) + mu*K)*s
+            for u in range(w):
+                s[u] *= f[u][j][decomp_i[j]]
+        for u in range(w):
+            R += M[i]*s[u]
     for j in range(m):
-        R1 -= X[j]*x**j
-        R2 -= Y[j]*x**j
-    if not R1 == zR*G or not R2 == zR*J:
+        R -= X[j]*x**j
+    if not R == zR*G:
         raise ArithmeticError('Failed commitment check!')
 
     return True
 
 # Basic test
 m = 3
-l = 1
+l = [1,2]
 
-r = random_scalar()
-s = random_scalar()
+r = [random_scalar(),random_scalar()]
 
 M = [random_point() for _ in range(2**m)]
-M[l] = r*G
-P = [random_point() for _ in range(2**m)]
-P[l] = s*G
+M[l[0]] = r[0]*G
+M[l[1]] = r[1]*G
 
-proof = prove(M,P,l,r,s,m)
-verify(M,P,proof,m)
+proof = prove(M,l,r,m)
+verify(M,proof,m)
