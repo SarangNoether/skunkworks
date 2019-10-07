@@ -10,11 +10,13 @@ H = hash_to_point('H')
 # Proof structure
 class Proof:
     def __init__(self):
+        self.J = None # key images
         self.A = None
         self.B = None
         self.C = None
         self.D = None
-        self.X = None
+        self.X = None # for signing keys
+        self.Y = None # for key images
         self.f = None
         self.zA = None
         self.zC = None
@@ -22,11 +24,13 @@ class Proof:
 
     def __repr__(self):
         temp = '<GrothProof> '
+        temp += 'J:'+repr(self.J)+'|'
         temp += 'A:'+repr(self.A)+'|'
         temp += 'B:'+repr(self.B)+'|'
         temp += 'C:'+repr(self.C)+'|'
         temp += 'D:'+repr(self.D)+'|'
         temp += 'X:'+repr(self.X)+'|'
+        temp += 'Y:'+repr(self.Y)+'|'
         temp += 'f:'+repr(self.f)+'|'
         temp += 'zA:'+repr(self.zA)+'|'
         temp += 'zC:'+repr(self.zC)+'|'
@@ -112,13 +116,17 @@ def prove(M,l,r,m):
     # Reconstruct the known commitments
     if not len(l) == len(r):
         raise IndexError('Index/blinder size mismatch!')
-
     w = len(l)
     for i in range(w):
         if not M[l[i]] == r[i]*G:
             raise ValueError('Bad commitment blinder!')
 
+    # Construct key images
+    J = []
+    for i in range(w):
+        J.append(r[i].invert()*hash_to_point(M[l[i]]))
 
+    # Prepare matrices and corresponding blinders
     rA = [random_scalar() for _ in range(w)]
     rB = [random_scalar() for _ in range(w)]
     rC = [random_scalar() for _ in range(w)]
@@ -188,21 +196,27 @@ def prove(M,l,r,m):
 
     # Generate proof values
     X = [dumb25519.Z for _ in range(m)]
-    rho = [random_scalar() for _ in range(m)]
+    Y = [dumb25519.Z for _ in range(m)]
+    rho = [[random_scalar() for _ in range(m)] for _ in range(w)]
     for j in range(m):
         for i in range(N):
             X[j] += M[i]*p[0][i][j]
-        X[j] += rho[j]*G
+            Y[j] += hash_to_point(M[i])*p[0][i][j]
+        for u in range(w):
+            X[j] += rho[u][j]*G
+            Y[j] += rho[u][j]*J[u]
 
     # Partial proof
     proof = Proof()
+    proof.J = J
     proof.A = A
     proof.B = B
     proof.C = C
     proof.D = D
     proof.X = X
+    proof.Y = Y
 
-    x = hash_to_scalar(M,A,B,C,D,X)
+    x = hash_to_scalar(M,J,A,B,C,D,X,Y)
 
     f = [[[None for _ in range(n)] for _ in range(m)] for _ in range(w)]
     for j in range(m):
@@ -212,13 +226,14 @@ def prove(M,l,r,m):
 
     zA = []
     zC = []
-    zR = Scalar(0)
+    zR = []
     for u in range(w):
         zA.append(rB[u]*x + rA[u])
         zC.append(rC[u]*x + rD[u])
-        zR += r[u]*x**m
+        zR.append(r[u]*x**m)
     for j in range(m):
-        zR -= rho[j]*x**j
+        for u in range(w):
+            zR[u] -= rho[u][j]*x**j
 
     # Assemble proof
     proof.f = f
@@ -240,18 +255,20 @@ def verify(M,proof,m):
     n = 2
     N = n**m
 
+    J = proof.J
     A = proof.A
     B = proof.B
     C = proof.C
     D = proof.D
     X = proof.X
+    Y = proof.Y
     f = proof.f
     zA = proof.zA
     zC = proof.zC
     zR = proof.zR
 
-    x = hash_to_scalar(M,A,B,C,D,X)
-    w = len(A)
+    x = hash_to_scalar(M,J,A,B,C,D,X,Y)
+    w = len(J)
 
     for j in range(m):
         for u in range(w):
@@ -276,7 +293,8 @@ def verify(M,proof,m):
             raise ArithmeticError('Failed C/D check!')
 
     # Commitment check
-    R = dumb25519.Z
+    RX = dumb25519.Z
+    RY = dumb25519.Z
     for i in range(N):
         s = [Scalar(1) for _ in range(w)]
         decomp_i = decompose(i,n,m)
@@ -284,10 +302,15 @@ def verify(M,proof,m):
             for u in range(w):
                 s[u] *= f[u][j][decomp_i[j]]
         for u in range(w):
-            R += M[i]*s[u]
+            RX += M[i]*s[u]
+            RY += hash_to_point(M[i])*s[u]
     for j in range(m):
-        R -= X[j]*x**j
-    if not R == zR*G:
+        RX -= X[j]*x**j
+        RY -= Y[j]*x**j
+    for u in range(w):
+        RX -= zR[u]*G
+        RY -= zR[u]*J[u]
+    if not RX == dumb25519.Z or not RY == dumb25519.Z:
         raise ArithmeticError('Failed commitment check!')
 
     return True
@@ -302,5 +325,7 @@ M = [random_point() for _ in range(2**m)]
 M[l[0]] = r[0]*G
 M[l[1]] = r[1]*G
 
+print 'Proving...'
 proof = prove(M,l,r,m)
+print 'Verifying...'
 verify(M,proof,m)
