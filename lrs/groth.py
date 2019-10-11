@@ -1,9 +1,13 @@
 # Proof-of-concept implementation of https://github.com/monero-project/research-lab/issues/56
+# This version proves knowledge of one or more commitments to zero in a list, with key images and amount commitments
 
-# This version proves knowledge of one or more commitments to zero in a list
+# TODO: confirm proper use of unique rho across commitment sums
+# TODO: include output commitments in Fiat-Shamir challenge
+# TODO: investigate key aggregation
 
-from dumb25519 import hash_to_point, random_scalar, Scalar, hash_to_scalar, G, random_point
+from dumb25519 import hash_to_point, random_scalar, Scalar, hash_to_scalar, G, random_point, Z
 import dumb25519
+import random
 
 H = hash_to_point('H')
 
@@ -17,10 +21,12 @@ class Proof:
         self.D = None
         self.X = None # for signing keys
         self.Y = None # for key images
+        self.Z = None # for amounts
         self.f = None
         self.zA = None
         self.zC = None
-        self.zR = None
+        self.zR = None # for signing keys and key images
+        self.zS = None # for amounts
 
     def __repr__(self):
         temp = '<GrothProof> '
@@ -31,10 +37,12 @@ class Proof:
         temp += 'D:'+repr(self.D)+'|'
         temp += 'X:'+repr(self.X)+'|'
         temp += 'Y:'+repr(self.Y)+'|'
+        temp += 'Z:'+repr(self.Z)+'|'
         temp += 'f:'+repr(self.f)+'|'
         temp += 'zA:'+repr(self.zA)+'|'
         temp += 'zC:'+repr(self.zC)+'|'
-        temp += 'zR:'+repr(self.zR)
+        temp += 'zR:'+repr(self.zR)+'|'
+        temp += 'zS:'+repr(self.zS)
         return temp
 
 # Pedersen vector commitment
@@ -100,21 +108,24 @@ def convolve(x,y,size=None):
 #
 # INPUT
 #  M: public key list
+#  P: amount commitment list
 #  l: list of indices such that each M[l[i]] is a commitment to zero
 #  r: list of Pedersen blinders for all M[l[i]]
+#  s: list of Pedersen blinders for all C[l[i]]
+#  t: sum of output commitment blinders
 #  m: dimension such that len(M) == 2**m
 # RETURNS
 #  proof structure
-def prove(M,l,r,m):
+def prove(M,P,l,r,s,t,m):
     n = 2 # binary decomposition
 
     # Size check
-    if not len(M) == n**m:
+    if not len(M) == n**m or not len(P) == n**m:
         raise IndexError('Bad size decomposition!')
     N = len(M)
 
     # Reconstruct the known commitments
-    if not len(l) == len(r):
+    if not len(l) == len(r) or not len(l) == len(s):
         raise IndexError('Index/blinder size mismatch!')
     w = len(l)
     for i in range(w):
@@ -197,14 +208,17 @@ def prove(M,l,r,m):
     # Generate proof values
     X = [dumb25519.Z for _ in range(m)]
     Y = [dumb25519.Z for _ in range(m)]
+    Z = [dumb25519.Z for _ in range(m)]
     rho = [[random_scalar() for _ in range(m)] for _ in range(w)]
     for j in range(m):
         for i in range(N):
             X[j] += M[i]*p[0][i][j]
             Y[j] += hash_to_point(M[i])*p[0][i][j]
+            Z[j] += P[i]*p[0][i][j]
         for u in range(w):
             X[j] += rho[u][j]*G
             Y[j] += rho[u][j]*J[u]
+            Z[j] += rho[u][j]*G
 
     # Partial proof
     proof = Proof()
@@ -215,8 +229,9 @@ def prove(M,l,r,m):
     proof.D = D
     proof.X = X
     proof.Y = Y
+    proof.Z = Z
 
-    x = hash_to_scalar(M,J,A,B,C,D,X,Y)
+    x = hash_to_scalar(M,J,A,B,C,D,X,Y,Z)
 
     f = [[[None for _ in range(n)] for _ in range(m)] for _ in range(w)]
     for j in range(m):
@@ -227,19 +242,24 @@ def prove(M,l,r,m):
     zA = []
     zC = []
     zR = []
+    zS = Scalar(0)
     for u in range(w):
         zA.append(rB[u]*x + rA[u])
         zC.append(rC[u]*x + rD[u])
         zR.append(r[u]*x**m)
+        zS += s[u]*x**m
     for j in range(m):
         for u in range(w):
             zR[u] -= rho[u][j]*x**j
+            zS -= rho[u][j]*x**j
+    zS -= t*x**m
 
     # Assemble proof
     proof.f = f
     proof.zA = zA
     proof.zC = zC
     proof.zR = zR
+    proof.zS = zS
 
     return proof
 
@@ -247,11 +267,13 @@ def prove(M,l,r,m):
 #
 # INPUT
 #  M: public key list
+#  P: amount commitment list
 #  proof: proof structure
+#  T: sum of output commitments
 #  m: dimension such that len(M) == 2**m
 # RETURNS
 #  True if the proof is valid
-def verify(M,proof,m):
+def verify(M,P,proof,T,m):
     n = 2
     N = n**m
 
@@ -262,12 +284,14 @@ def verify(M,proof,m):
     D = proof.D
     X = proof.X
     Y = proof.Y
+    Z = proof.Z
     f = proof.f
     zA = proof.zA
     zC = proof.zC
     zR = proof.zR
+    zS = proof.zS
 
-    x = hash_to_scalar(M,J,A,B,C,D,X,Y)
+    x = hash_to_scalar(M,J,A,B,C,D,X,Y,Z)
     w = len(J)
 
     for j in range(m):
@@ -295,37 +319,74 @@ def verify(M,proof,m):
     # Commitment check
     RX = dumb25519.Z
     RY = dumb25519.Z
+    RZ = dumb25519.Z
     for i in range(N):
-        s = [Scalar(1) for _ in range(w)]
+        t = [Scalar(1) for _ in range(w)]
         decomp_i = decompose(i,n,m)
         for j in range(m):
             for u in range(w):
-                s[u] *= f[u][j][decomp_i[j]]
+                t[u] *= f[u][j][decomp_i[j]]
         for u in range(w):
-            RX += M[i]*s[u]
-            RY += hash_to_point(M[i])*s[u]
+            RX += M[i]*t[u]
+            RY += hash_to_point(M[i])*t[u]
+            RZ += P[i]*t[u]
     for j in range(m):
         RX -= X[j]*x**j
         RY -= Y[j]*x**j
+        RZ -= Z[j]*x**j
     for u in range(w):
         RX -= zR[u]*G
         RY -= zR[u]*J[u]
     if not RX == dumb25519.Z or not RY == dumb25519.Z:
         raise ArithmeticError('Failed commitment check!')
+    if not RZ - T*x**m == zS*G:
+        raise ArithmeticError('Failed balance check!')
 
     return True
 
+#
 # Basic test
-m = 3
-l = [1,2]
+#
 
-r = [random_scalar(),random_scalar()]
+# Parameters
+m = 3 # ring size is 2**m
+spends = 2 # number of spent inputs
+outs = 3 # number of generated outputs
 
-M = [random_point() for _ in range(2**m)]
-M[l[0]] = r[0]*G
-M[l[1]] = r[1]*G
+# Set up the test
+spend_indices = random.sample(range(2**m),spends) # spend indices
+sign_keys = [random_scalar() for _ in range(spends)] # signing keys
+in_blinders = [random_scalar() for _ in range(spends)] # input commitment blinders
+in_amounts = [random_scalar() for _ in range(spends)] # input commitment amounts
+out_blinders = [random_scalar() for _ in range(outs)] # output commitment blinders
+out_amounts = [random_scalar() for _ in range(outs)] # output commitment amounts
 
+# Ensure output amounts balance input amounts
+out_amounts[0] = Scalar(0)
+for i in range(len(in_amounts)):
+    out_amounts[0] += in_amounts[i]
+for i in range(1,len(out_amounts)):
+    out_amounts[0] -= out_amounts[i]
+
+# Compute output blinder sum
+out_blinder_sum = Scalar(0)
+for i in range(len(out_blinders)):
+    out_blinder_sum += out_blinders[i]
+
+# Compute output commitment sum
+out_commit_sum = Z
+for i in range(len(out_blinders)):
+    out_commit_sum += out_blinders[i]*G + out_amounts[i]*H
+
+# Set all keys and commitments
+M = [random_point() for _ in range(2**m)] # possible signing keys
+C = [random_point() for _ in range(2**m)] # corresponding commitments
+for i in range(spends):
+    M[spend_indices[i]] = sign_keys[i]*G
+    C[spend_indices[i]] = in_blinders[i]*G + in_amounts[i]*H
+
+# Run test
 print 'Proving...'
-proof = prove(M,l,r,m)
+proof = prove(M,C,spend_indices,sign_keys,in_blinders,out_blinder_sum,m)
 print 'Verifying...'
-verify(M,proof,m)
+verify(M,C,proof,out_commit_sum,m)
