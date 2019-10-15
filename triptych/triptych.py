@@ -29,7 +29,7 @@ class Proof:
         self.zS = None # for amounts
 
     def __repr__(self):
-        temp = '<GrothProof> '
+        temp = '<TriptychProof> '
         temp += 'J:'+repr(self.J)+'|'
         temp += 'A:'+repr(self.A)+'|'
         temp += 'B:'+repr(self.B)+'|'
@@ -108,15 +108,18 @@ def convolve(x,y,size=None):
 #
 # INPUT
 #  M: public key list
-#  P: amount commitment list
+#  P: input commitment list
+#  Q: output commitment list
 #  l: list of indices such that each M[l[i]] is a commitment to zero
 #  r: list of Pedersen blinders for all M[l[i]]
-#  s: list of Pedersen blinders for all C[l[i]]
-#  t: sum of output commitment blinders
+#  s: list of Pedersen blinders for all P[l[i]]
+#  t: list of Pedersen blinders for all Q[l[i]]
+#  a: list of Pedersen values for all P[l[i]]
+#  b: list of Pedersen values for all Q[l[i]]
 #  m: dimension such that len(M) == 2**m
 # RETURNS
 #  proof structure
-def prove(M,P,l,r,s,t,m):
+def prove(M,P,Q,l,r,s,t,a,b,m):
     n = 2 # binary decomposition
 
     # Size check
@@ -231,7 +234,8 @@ def prove(M,P,l,r,s,t,m):
     proof.Y = Y
     proof.Z = Z
 
-    x = hash_to_scalar(M,J,A,B,C,D,X,Y,Z)
+    # Fiat-Shamir transcript challenge
+    x = hash_to_scalar(M,P,Q,J,A,B,C,D,X,Y,Z)
 
     f = [[[None for _ in range(n)] for _ in range(m)] for _ in range(w)]
     for j in range(m):
@@ -252,7 +256,8 @@ def prove(M,P,l,r,s,t,m):
         for u in range(w):
             zR[u] -= rho[u][j]*x**j
             zS -= rho[u][j]*x**j
-    zS -= t*x**m
+    for i in range(len(t)):
+        zS -= t[i]*x**m
 
     # Assemble proof
     proof.f = f
@@ -267,13 +272,13 @@ def prove(M,P,l,r,s,t,m):
 #
 # INPUT
 #  M: public key list
-#  P: amount commitment list
+#  P: input commitment list
+#  Q: output commitment list
 #  proof: proof structure
-#  T: sum of output commitments
 #  m: dimension such that len(M) == 2**m
 # RETURNS
 #  True if the proof is valid
-def verify(M,P,proof,T,m):
+def verify(M,P,Q,proof,m):
     n = 2
     N = n**m
 
@@ -291,7 +296,9 @@ def verify(M,P,proof,T,m):
     zR = proof.zR
     zS = proof.zS
 
-    x = hash_to_scalar(M,J,A,B,C,D,X,Y,Z)
+    # Fiat-Shamir transcript challenge
+    x = hash_to_scalar(M,P,Q,J,A,B,C,D,X,Y,Z)
+
     w = len(J)
 
     for j in range(m):
@@ -339,10 +346,14 @@ def verify(M,P,proof,T,m):
         RY -= zR[u]*J[u]
     if not RX == dumb25519.Z or not RY == dumb25519.Z:
         raise ArithmeticError('Failed commitment check!')
+    T = dumb25519.Z
+    for j in range(len(Q)):
+        T += Q[j]
     if not RZ - T*x**m == zS*G:
         raise ArithmeticError('Failed balance check!')
 
     return True
+
 
 #
 # Basic test
@@ -354,39 +365,32 @@ spends = 2 # number of spent inputs
 outs = 3 # number of generated outputs
 
 # Set up the test
-spend_indices = random.sample(range(2**m),spends) # spend indices
-sign_keys = [random_scalar() for _ in range(spends)] # signing keys
-in_blinders = [random_scalar() for _ in range(spends)] # input commitment blinders
-in_amounts = [random_scalar() for _ in range(spends)] # input commitment amounts
-out_blinders = [random_scalar() for _ in range(outs)] # output commitment blinders
-out_amounts = [random_scalar() for _ in range(outs)] # output commitment amounts
+l = random.sample(range(2**m),spends) # spend indices
+r = [random_scalar() for _ in range(spends)] # signing keys
+s = [random_scalar() for _ in range(spends)] # input commitment blinders
+a = [random_scalar() for _ in range(spends)] # input commitment amounts
+t = [random_scalar() for _ in range(outs)] # output commitment blinders
+b = [random_scalar() for _ in range(outs)] # output commitment amounts
 
 # Ensure output amounts balance input amounts
-out_amounts[0] = Scalar(0)
-for i in range(len(in_amounts)):
-    out_amounts[0] += in_amounts[i]
-for i in range(1,len(out_amounts)):
-    out_amounts[0] -= out_amounts[i]
-
-# Compute output blinder sum
-out_blinder_sum = Scalar(0)
-for i in range(len(out_blinders)):
-    out_blinder_sum += out_blinders[i]
-
-# Compute output commitment sum
-out_commit_sum = Z
-for i in range(len(out_blinders)):
-    out_commit_sum += out_blinders[i]*G + out_amounts[i]*H
+b[0] = Scalar(0)
+for i in range(len(a)):
+    b[0] += a[i]
+for i in range(1,len(b)):
+    b[0] -= b[i]
 
 # Set all keys and commitments
 M = [random_point() for _ in range(2**m)] # possible signing keys
-C = [random_point() for _ in range(2**m)] # corresponding commitments
-for i in range(spends):
-    M[spend_indices[i]] = sign_keys[i]*G
-    C[spend_indices[i]] = in_blinders[i]*G + in_amounts[i]*H
+P = [random_point() for _ in range(2**m)] # corresponding commitments
+Q = []
+for i in range(outs): # output commitments
+    Q.append(t[i]*G + b[i]*H)
+for i in range(spends): # spend commitments
+    M[l[i]] = r[i]*G
+    P[l[i]] = s[i]*G + a[i]*H
 
 # Run test
 print 'Proving...'
-proof = prove(M,C,spend_indices,sign_keys,in_blinders,out_blinder_sum,m)
+proof = prove(M,P,Q,l,r,s,t,a,b,m)
 print 'Verifying...'
-verify(M,C,proof,out_commit_sum,m)
+verify(M,P,Q,proof,m)
