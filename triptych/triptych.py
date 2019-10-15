@@ -41,7 +41,7 @@ class Proof:
         temp += 'zS:'+repr(self.zS)
         return temp
 
-# Pedersen vector commitment
+# Pedersen tensor commitment
 def com_tensor(v,r):
     C = dumb25519.Z
     for i in range(len(v)):
@@ -60,17 +60,6 @@ def decompose(val,base,size,t=int):
         r.append(int(val/slot))
         val -= slot*r[-1]
     r = list(reversed(r))
-
-    # Reconstruct to ensure correct decomposition
-    if t == int:
-        temp = 0
-    else:
-        temp = Scalar(0)
-
-    for i in range(len(r)):
-        temp += r[i]*base**i
-    if not temp == temp_val:
-        raise ArithmeticError('Decomposition failed!')
 
     # Return int list or Scalar list
     if t == int:
