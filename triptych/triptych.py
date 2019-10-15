@@ -46,11 +46,12 @@ class Proof:
         return temp
 
 # Pedersen vector commitment
-def com_matrix(v,r):
+def com_tensor(v,r):
     C = dumb25519.Z
     for i in range(len(v)):
         for j in range(len(v[0])):
-            C += hash_to_point('Gi',i,j)*v[i][j]
+            for k in range(len(v[0][0])):
+                C += hash_to_point('Gi',i,j,k)*v[i][j][k]
     C += r*H
     return C
 
@@ -141,15 +142,10 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
         J.append(r[i].invert()*hash_to_point(M[l[i]]))
 
     # Prepare matrices and corresponding blinders
-    rA = [random_scalar() for _ in range(w)]
-    rB = [random_scalar() for _ in range(w)]
-    rC = [random_scalar() for _ in range(w)]
-    rD = [random_scalar() for _ in range(w)]
-
-    A = []
-    B = []
-    C = []
-    D = []
+    rA = random_scalar()
+    rB = random_scalar()
+    rC = random_scalar()
+    rD = random_scalar()
 
     # Commit to zero-sum blinders
     a = [[[random_scalar() for _ in range(n)] for _ in range(m)] for _ in range(w)]
@@ -159,8 +155,7 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
         for i in range(1,n):
             for u in range(w):
                 a[u][j][0] -= a[u][j][i]
-    for u in range(w):
-        A.append(com_matrix(a[u],rA[u]))
+    A = com_tensor(a,rA)
 
     # Commit to decomposition bits
     decomp_l = []
@@ -171,8 +166,7 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
         for i in range(n):
             for u in range(w):
                 sigma[u][j][i] = delta(decomp_l[u][j],i)
-    for u in range(w):
-        B.append(com_matrix(sigma[u],rB[u]))
+    B = com_tensor(sigma,rB)
 
     # Commit to a/sigma relationships
     a_sigma = [[[Scalar(0) for _ in range(n)] for _ in range(m)] for _ in range(w)]
@@ -180,8 +174,7 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
         for i in range(n):
             for u in range(w):
                 a_sigma[u][j][i] = a[u][j][i]*(Scalar(1) - Scalar(2)*sigma[u][j][i])
-    for u in range(w):
-        C.append(com_matrix(a_sigma[u],rC[u]))
+    C = com_tensor(a_sigma,rC)
     
     # Commit to squared a-values
     a_sq = [[[Scalar(0) for _ in range(n)] for _ in range(m)] for _ in range(w)]
@@ -189,8 +182,7 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
         for i in range(n):
             for u in range(w):
                 a_sq[u][j][i] = -a[u][j][i]**2
-    for u in range(w):
-        D.append(com_matrix(a_sq[u],rD[u]))
+    D = com_tensor(a_sq,rD)
 
     # Compute p coefficients
     p = [[[Scalar(0) for _ in range(m)] for _ in range(N)] for _ in range(w)]
@@ -243,13 +235,11 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
             for u in range(w):
                 f[u][j][i] = sigma[u][j][i]*x + a[u][j][i]
 
-    zA = []
-    zC = []
+    zA = rB*x + rA
+    zC = rC*x + rD
     zR = []
     zS = Scalar(0)
     for u in range(w):
-        zA.append(rB[u]*x + rA[u])
-        zC.append(rC[u]*x + rD[u])
         zR.append(r[u]*x**m)
         zS += s[u]*x**m
     for j in range(m):
@@ -301,17 +291,15 @@ def verify(M,P,Q,proof,m):
 
     w = len(J)
 
+    # A/B check
     for j in range(m):
         for u in range(w):
             f[u][j][0] = x
         for i in range(1,n):
             for u in range(w):
                 f[u][j][0] -= f[u][j][i]
-
-    # A/B check
-    for u in range(w):
-        if not com_matrix(f[u],zA[u]) == B[u]*x + A[u]:
-            raise ArithmeticError('Failed A/B check!')
+    if not com_tensor(f,zA) == B*x + A:
+        raise ArithmeticError('Failed A/B check!')
 
     # C/D check
     fx = [[[None for _ in range(n)] for _ in range(m)] for _ in range(w)]
@@ -319,9 +307,8 @@ def verify(M,P,Q,proof,m):
         for i in range(n):
             for u in range(w):
                 fx[u][j][i] = f[u][j][i]*(x-f[u][j][i])
-    for u in range(w):
-        if not com_matrix(fx[u],zC[u]) == C[u]*x + D[u]:
-            raise ArithmeticError('Failed C/D check!')
+    if not com_tensor(fx,zC) == C*x + D:
+        raise ArithmeticError('Failed C/D check!')
 
     # Commitment check
     RX = dumb25519.Z
