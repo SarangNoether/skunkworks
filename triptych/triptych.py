@@ -1,10 +1,6 @@
 # Proof-of-concept implementation of https://github.com/monero-project/research-lab/issues/56
 # This version proves knowledge of one or more commitments to zero in a list, with key images and amount commitments
 
-# TODO: confirm proper use of unique rho across commitment sums
-# TODO: include output commitments in Fiat-Shamir challenge
-# TODO: investigate key aggregation
-
 from dumb25519 import hash_to_point, random_scalar, Scalar, hash_to_scalar, G, random_point, Z
 import dumb25519
 import random
@@ -324,6 +320,7 @@ def verify(M,P,Q,proof,m):
             RX += M[i]*t[u]
             RY += hash_to_point(M[i])*t[u]
             RZ += P[i]*t[u]
+
     for j in range(m):
         RX -= X[j]*x**j
         RY -= Y[j]*x**j
@@ -331,11 +328,14 @@ def verify(M,P,Q,proof,m):
     for u in range(w):
         RX -= zR[u]*G
         RY -= zR[u]*J[u]
-    if not RX == dumb25519.Z or not RY == dumb25519.Z:
-        raise ArithmeticError('Failed commitment check!')
     T = dumb25519.Z
     for j in range(len(Q)):
         T += Q[j]
+
+    if not RX == dumb25519.Z:
+        raise ArithmeticError('Failed signing key check!')
+    if not RY == dumb25519.Z:
+        raise ArithmeticError('Failed linking check!')
     if not RZ - T*x**m == zS*G:
         raise ArithmeticError('Failed balance check!')
 
@@ -349,7 +349,7 @@ def verify(M,P,Q,proof,m):
 # Parameters
 m = 3 # ring size is 2**m
 spends = 2 # number of spent inputs
-outs = 3 # number of generated outputs
+outs = 2 # number of generated outputs
 
 # Set up the test
 l = random.sample(range(2**m),spends) # spend indices
