@@ -1,0 +1,176 @@
+\documentclass[draft]{article}
+\usepackage[top=1.0in,bottom=1.0in,left=0.5in,right=0.5in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage[utf8]{inputenc}
+\usepackage{hyperref}
+
+\title{Triptych}
+\author{Sarang Noether and Arthur Blue}
+\date{\today}
+
+\newcommand{\G}{\mathbb{G}}
+\newcommand{\F}{\mathbb{F}}
+\newcommand{\hs}{\mathsf{H}}
+\newcommand{\hp}{\mathcal{H}}
+\newcommand{\com}{\operatorname{Com}}
+
+\newcommand{\sumi}{\sum_{i=0}^{n-1}}
+\newcommand{\sumj}{\sum_{j=0}^{m-1}}
+\newcommand{\sumk}{\sum_{k=0}^{N-1}}
+\newcommand{\sumu}{\sum_{u=0}^{w-1}}
+
+\begin{document}
+
+\maketitle
+
+\textbf{NOTE:} This document is a work in progress and is \textit{extremely} incomplete.
+
+
+\section{Introduction}
+This document describes the Triptych transaction protocol\footnote{\url{https://github.com/SarangNoether/skunkworks/tree/triptych}}. Triptych uses a modification to a one-of-many commitment to zero proving construction by Bootle \textit{et al.} \cite{bootle} that itself is a generalization of earlier work by Groth and Kohlweiss \cite{groth}. It extends these approaches in two ways. First, we show how to generalize the proof to show knowledge of the openings of multiple commitments in a single list; this necessitates the addition of linking tags to ensure uniqueness of the opened commitments. Second, we show how to leverage the same proof to show general openings of commitments not necessarily to zero via a summation protocol. The use of these components in a single proof is much more efficient than an equivalent construction using multiple proofs.
+
+Taken together, these generalizations permit a useful application as a transaction protocol. If output public keys are considered as commitments to zero with Pedersen blinders set to the corresponding private keys, and each such public key comes equipped with a separate commitment to the output's amount, we can use a single Triptych proof to permit the spending of multiple outputs while detecting double-spending attempts and showing transaction balance without leaking amount or signer information.
+
+Triptych proofs are logarithmic in size with the number of possible signers, are efficient to verify using a single multiscalar multiplication operation, and can use delayed batch verification of arbitrary proofs for further efficiency gains.
+
+\subsection{Warning}
+There is currently no security model established for Triptych, and no proofs of security (except for correctness). This document currently serves only to describe the construction and its algorithms. It should not be considered secure or safe for use without extensive additional formalization and analysis. This is very early research that is still under active development.
+
+
+\section{Algorithms}
+Let $\G$ be a cyclic group in which the discrete logarithm problem is hard, and let $\F$ be its scalar field. Let $\hs$ be a cryptographic hash function mapping arbitrary input to $\F$. Let $\hp$ be a cryptographic hash function mapping arbitrary input to $\G$. Assume that any point of the form $G_i$ or $H_i$ (possibly with multiple indices) is a generator of $\G$ whose discrete logarithm relationship with all other such points is unknown; in the case of elliptic curve groups, using an indexed $\hp$ operation is appropriate for these generators. Let $G, H$ be distinguished generators used for Pedersen commitments.
+
+Assume that previously-generated transaction outputs are constructed as Pedersen commitments to zero, such that an output is of the form $M \equiv rG$. We do not consider here the method by which output keys are generated, but assume this is offloaded to another protocol. Each output comes equipped with an amount commitment $P \equiv sG + aH$, where $a$ is the amount and $s$ a blinding factor.
+
+A user of the protocol wishes to spend $w$ distinct outputs $\{M_u\}_{u=0}^{w-1}$ for which it knows the corresponding private keys, and generate $T$ new outputs such that the amounts balance between input and output commitments. Further, it wishes to demonstrate to other users of the protocol that none of the $w$ outputs has been previously spent in another transaction.
+
+To obscure the set $\{M_i\}$ being spent in the transaction, the user includes a number of other outputs in the list, for which it does not necessarily know the private keys. Note this is a non-interactive process that does not require the participation of the owners of the other outputs.
+
+Suppose the user has such a list of $N$ outputs, randomly shuffled such that for $0 \leq u < w$, the quantity $0 \leq l^{(u)} < N$ represents the index of an output to be spent. Note that the mapping $u \mapsto l^{(u)}$ is one-to-one. We assume that $N = n^m$ for some $n,m$. In practice this is not a practical concern, since it is always possible to include additional outputs to the set. The user generates $T$ new outputs whose associated amount commitments are $\{Q_j\}_{j=0}^{T-1}$, and such that the input and output amounts balance between spent input commitments and newly-generated output commitments.
+
+
+\subsection{Notation}
+For a three-dimensional tensor $f \equiv (f_{i,j,k}) \subset \F^3$ and blinding factor $r \in \F$, define the Pedersen tensor commitment $$\com(f,r) \equiv rH + \sum_{i,j,k} f_{i,j,k} G_{i,j,k}$$ using fixed independent generators as described above. Operations on tensors are assumed to be performed componentwise. The ordering of elements of $f$ is assumed to be known and canonical.
+
+For integers or scalars $i,j$, the Kronecker delta function $\delta(i,j)$ evaluates to $1$ if $i=j$ and $0$ otherwise, where the output is taken to be in the appropriate set.
+
+We sometimes use index subscript notation of the form $i_j$ to indicate the $j$ digit of $i$, where such a decomposition of $i$ is taken base $n$ with padded length $m$. That is, for $n=2$, this indexes a binary decomposition. This notation will be specified explicitly where confusion may occur.
+
+
+\subsection{Prover}
+The prover algorithm accepts the following:
+\begin{itemize}
+\item a set of outputs $\{M_k\}_{k=0}^{N-1} \subset \G$
+\item a set of corresponding amount commitments $\{P_k\}_{k=0}^{N-1} \subset \G$
+\item a set of private keys $\{r^{(u)}\}_{u=0}^{w-1} \subset \F$
+\item a set of commitment amounts and blinding factors $\{(s^{(u)},a_u)\}_{u=0}^{w-1} \subset \F^2$
+\item a set $\{l^{(u)}\}_{u=0}^{w-1} \subset \F$ such that:
+\begin{itemize}
+\item each $M_{l^{(u)}} = r^{(u)}G$ has its private key known to the prover
+\item each $P_{l^{(u)}} = s^{(u)}G + a_uH$ has its amount and blinding factor known to the prover
+\end{itemize}
+\item a set of new amount commitments $\{Q_j\}_{j=0}^{T-1} \subset \G$
+\item a set of commitment amounts and blinding factors $\{(t_j,b_j)\}_{j=0}^{T-1} \subset \F^2$ such that:
+\begin{itemize}
+\item each $Q_j = t_jG + b_jH$ has its amount and blinding factor known to the prover
+\item $\sum_{u=0}^{w-1} a_j - \sum_{j=0}^{T-1} b_j = 0$
+\end{itemize}
+\end{itemize}
+
+The prover then performs these steps:
+\begin{itemize}
+\item Define $\left\{J^{(u)}\right\}_{u=0}^{w-1} \subset \G$ such that $J^{(u)} \equiv (r^{(u)})^{-1}\hp(M_{l_u})$.
+\item Select random $r_A \in \F$ and $\left\{a^{(u)}_{j,i}\right\}_{i=1,j,u=0}^{n-1,m-1,w-1} \subset \F^3$. Define $A \equiv \com(a,r_A)$.
+\item Define $\left\{\sigma^{(u)}_{j,i}\right\}_{i,j,u=0}^{n-1,j-1,w-1} \subset \F^3$ such that $\sigma^{(u)}_{j,i} \equiv \delta\left(l^{(u)}_j,i\right)$ (using our decomposition notation), and choose random $r_B \in \F$. Define $B \equiv \com(\sigma,r_B)$.
+\item Select random $r_C \in \F$, and define $C \equiv \com(a(1-2\sigma), r_C)$.
+\item Select random $r_D \in \F$, and define $D \equiv \com(-a^2, r_D)$.
+\item Select random $\left\{\rho^{(u)}_j\right\}_{j,u=0}^{m-1,w-1} \subset \F^2$.
+\item For each $0 \leq u < w$, define coefficients $\left\{p^{(u)}_{k,j}\right\}_{k,j=0}^{N-1,m-1}$ such that $$p^{(u)}_k(x) \equiv \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} = \delta\left(l^{(u)},k\right)x^m + \sumj p^{(u)}_{k,j}x^j$$ (using our decomposition notation). Then define $p_{k,j} \equiv \sumu p^{(u)}_{k,j}$ and $p_k(x) \equiv \sumu p^{(u)}_k(x)$ accordingly.
+\item Define $\{X_j\}_{j=0}^{m-1} \subset \G$ such that: $$X_j \equiv \sumk p_{k,j}M_k + \sumu \rho^{(u)}_jG$$
+\item Define $\{Y_j\}_{j=0}^{m-1} \subset \G$ such that: $$Y_j \equiv \sumk p_{k,j}\hp(M_k) + \sumu \rho^{(u)}_jJ^{(u)}$$
+\item Define $\{Z_j\}_{j=0}^{m-1} \subset \G$ such that: $$Z_j \equiv \sumk p_{k,j}P_k + \sumu \rho^{(u)}_jG$$
+\item Define the Fiat-Shamir transcript challenge $x \in \F$ computed using all public parameters and these elements (with set notation dropped for brevity): $$M,P,Q,J,A,B,C,D,X,Y,Z$$
+\item Define $\left\{f^{(u)}_{j,i}\right\}_{i=1,j,u=0}^{n-1,m-1,w-1}$ such that $f^{(u)}_{j,i} \equiv \sigma^{(u)}_{j,i}x + a^{(u)}_{j,i}$.
+\item Define $z_A \equiv r_A + xr_B$ and $z_C \equiv xr_C + r_D$.
+\item Define $\left\{z^{(u)}_R\right\}_{u=0}^{w-1} \subset \F$ such that: $$z^{(u)}_R \equiv r^{(u)}x^m - \sumj \rho^{(u)}_jx^j$$
+\item Define: $$z_S \equiv x^m\left( \sumu s^{(u)} - \sum_{j=0}^{T-1} t_j \right) - \sumj \left(x^j \sumu \rho^{(u)}_j\right)$$
+\end{itemize}
+
+The proof consists of these elements (with set notation dropped for brevity):
+$$J,A,B,C,D,X,Y,Z,f,z_A,z_C,z_R,z_S$$
+A proof consists of $3m + w + 4$ elements of $\G$, and $w\left[ m(n-1) + 1 \right] + 3$ elements of $\F$.
+
+
+\subsection{Verifier}
+The verifier accepts the following:
+\begin{itemize}
+\item a set of outputs $\{M_k\}_{k=0}^{N-1}$
+\item a set of corresponding amount commitments $\{P_k\}_{k=0}^{N-1}$
+\item a proof generated by a prover
+\end{itemize}
+
+All prover-supplied elements are checked to ensure their membership in the proper set (either the scalar field $\F$ or the group $\G$, as appropriate). The verifier uses the public parameters and proof elements to construct the Fiat-Shamir transcript challenge $x$, and then performs these steps:
+\begin{itemize}
+\item Ensure that each $J^{(u)}$ is unique for $0 \leq u < w$. Reject otherwise.
+\item For all $0 \leq u < w$ and $0 \leq j < m$, set: $$f^{(u)}_{j,0} \equiv x - \sum_{i=1}^{n-1} f^{(u)}_{j,i}$$
+\item{($A/B$ check)} Check that $\com(f,z_A) = A + xB$ and reject otherwise.
+\item{($C/D$ check)} Check that $\com(f(x-f),z_C) = xC + D$ and reject otherwise.
+\item{($X$ check)} Check that $$\sumk M_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jX_j - \sumu z^{(u)}_RG = 0$$ and reject otherwise.
+\item{($Y$ check)} Check that $$\sumk \hp(M_k) \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jY_j - \sumu z^{(u)}_RJ^{(u)} = 0$$ and reject otherwise.
+\item{($Z$ check)} Check that $$\sumk P_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jZ_j - x^m\sum_{j=0}^{T-1} Q_j - z_SG = 0$$ and reject otherwise.
+\end{itemize}
+
+
+\section{Security}
+We are interested initially to know whether the Triptych proving system is correct.
+
+\subsection{Correctness}
+To show that a correct proof will always be accepted by an honest verifier, we examine each verifier check separately.
+
+The $A/B$ check passes using the identity $$\sumi \sigma^{(u)}_{j,i} = 1$$ for all $0 \leq j < m$ and $0 \leq u < w$.
+
+The $C/D$ check passes similarly, using the identity $$\left(\sigma^{(u)}_{j,i}\right)^2 = \sigma^{(u)}_{j,i}$$ for all $0 \leq j < m$ and $0 \leq u < w$.
+
+To show the correctness of the $X$ check:
+\begin{eqnarray*}
+&& \sumk M_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jX_j - \sumu z^{(u)}_RG \\
+&=& \sumk M_k p_k(x) - \sumj x^j \left( \sumk p_{k,j}M_k + \sumu \rho^{(u)}_jG \right) - \sumu z^{(u)}_RG \\
+&=& \sumk M_k \left( p_k(x) - \sumj x^j p_{k,j} \right) - \sumj x^j \sumu \rho^{(u)}_jG - \sumu z^{(u)}_RG \\
+&=& \sumk M_k \left[ \sumu \delta\left( l^{(u)},k \right) \right] - \sumj x^j \sumu \rho^{(u)}_jG - \sumu\left[ r^{(u)}x^m - \sumj \rho^{(u)}_jx^j \right]G \\
+&=& x^m\sumu r^{(u)}G - \sumj x^j \sumu \rho^{(u)}_jG - x^m\sumu r^{(u)}G + \sumj x^j \sumu \rho^{(u)}_jG \\
+&=& 0
+\end{eqnarray*}
+
+The $Y$-check proceeds similarly, but with more irritating algebra:
+\begin{eqnarray*}
+&& \sumk \hp(M_k) \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jY_j - \sumu z^{(u)}_RJ^{(u)} \\
+&=& \sumk \hp(M_k) p_k(x) - \sumj x^j \left( \sumk p_{k,j}\hp(M_k) + \sumu \rho^{(u)}_jJ^{(u)} \right) - \sumu z^{(u)}_RJ^{(u)} \\
+&=& \sumk \hp(M_k) \left( p_k(x) - \sumj x^j p_{k,j} \right) - \sumj x^j \sumu \rho^{(u)}_jJ^{(u)} - \sumu z^{(u)}_RJ^{(u)} \\
+&=& \sumk \hp(M_k) \left[ \sumu \delta\left( l^{(u)},k \right) \right] - \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}\hp(M_{l^{(u)}}) - \sumu\left[ r^{(u)}x^m - \sumj \rho^{(u)}_jx^j \right](r^{(u)})^{-1}\hp(M_{l^{(u)}}) \\
+&=& x^m\sumu \hp(M_{l^{(u)}}) - \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}\hp(M_{l^{(u)}}) - x^m\sumu \hp(M_{l^{(u)}}) + \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}\hp(M_{l^{(u)}}) \\
+&=& 0
+\end{eqnarray*}
+
+Finally, the $Z$-check:
+\begin{eqnarray*}
+&& \sumk P_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jZ_j - x^m\sum_{j=0}^{T-1} Q_j - z_SG \\
+&=& \sumk P_k p_k(x) - \sumj x^j \left( \sumk p_{k,j}P_k + \sumu \rho^{(u)}_jG \right) - x^m\sum_{j=0}^{T-1} Q_j - z_SG \\
+&=& \sumk P_k \left( p_k(x) - \sumj x^j p_{k,j} \right) - \sumj x^j \sumu \rho^{(u)}_jG - x^m\sum_{j=0}^{T-1} Q_j - z_SG \\
+&=& x^m\sumu (s^{(u)}G + a_uH) - \sumj x^j \sumu \rho^{(u)}_jG - x^m\sum_{j=0}^{T-1} (t_jG + b_jH) - x^m\left( \sumu s^{(u)} - \sum_{j=0}^{T-1} t_j \right)G + \sumj x^j \sumu \rho^{(u)}_jG \\
+&=& \left( \sumu a_u - \sum_{j=0}^{T-1} b_j \right)H \\
+&=& 0
+\end{eqnarray*}
+
+
+\section{Optimizations}
+We note that all verifier checks can be reduced to multiscalar multiplications yielding the identity element in $\G$, and that the tensor commitment $A/B$ and $C/D$ checks have the same number of elements if the parameters $n,m,u$ are assumed to be fixed. This means the verifier can verify all such commitments (whether part of the same proof or not) by combining scalars across common generators using a set of verifier-selected random weighting factors. This combination of commitments may be similarly weight-combined with the $X,Y,Z$ checks. The end result is that a collection of arbitrary proofs may be verified using a single multiscalar multiplication operation, with common generators reused as they appear.
+
+Several algorithms exist for evaluating multiscalar multiplications more efficiently than a straightforward multiply-then-add arrangement, reducing the overall time complexity of a multiscalar multiplication with $N$ terms as low as $O(N/\log(N))$, such as the Straus \cite{straus} and Pippenger \cite{pippenger} families of algorithms.
+
+Further, note that newly-generated output commitments must come equipped with range proofs demonstrating that amounts lie within a range sufficiently below $|\G|$ to avoid overflow. The Bulletproofs range proof construction is particularly efficient for this purpose \cite{bulletproofs}. It too supports delayed batch verification of the same type discussed here, offering additional optimizations. In particular, combining the fixed generators from the Bulletproofs public parameters with the fixed generators in Triptych can further reduce the time complexity of verification. The size of Bulletproofs range proofs is logarithmic in the product of the number of bits in the range and the number of outputs generated.
+
+
+\bibliographystyle{plain}
+\bibliography{main}
+
+\end{document}
