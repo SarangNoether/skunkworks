@@ -27,34 +27,59 @@
 
 
 \section{Introduction}
-This document describes the Triptych transaction protocol\footnote{\url{https://github.com/SarangNoether/skunkworks/tree/triptych}}. Triptych uses a modification to a one-of-many commitment to zero proving construction by Bootle \textit{et al.} \cite{bootle} that itself is a generalization of earlier work by Groth and Kohlweiss \cite{groth}. It extends these approaches in two ways. First, we show how to generalize the proof to show knowledge of the openings of multiple commitments in a single list; this necessitates the addition of linking tags to ensure uniqueness of the opened commitments. Second, we show how to leverage the same proof to show general openings of commitments not necessarily to zero via a summation protocol. The use of these components in a single proof is much more efficient than an equivalent construction using multiple proofs.
+This document describes the Triptych transaction protocol\footnote{\url{https://github.com/SarangNoether/skunkworks/tree/triptych}}.
+Triptych uses a modification to a one-of-many commitment to zero proving construction by Bootle \textit{et al.} \cite{bootle} that itself is a generalization of earlier work by Groth and Kohlweiss \cite{groth}.
+It extends these approaches in two ways.
+First, we show how to generalize the proof to show knowledge of the openings of multiple commitments in a single list; this necessitates the addition of linking tags to ensure uniqueness of the opened commitments.
+Second, we show how to leverage the same proof to show general openings of commitments not necessarily to zero via a summation protocol.
+The use of these components in a single proof is much more efficient than an equivalent construction using multiple proofs.
 
-Taken together, these generalizations permit a useful application as a transaction protocol. If output public keys are considered as commitments to zero with Pedersen blinders set to the corresponding private keys, and each such public key comes equipped with a separate commitment to the output's amount, we can use a single Triptych proof to permit the spending of multiple outputs while detecting double-spending attempts and showing transaction balance without leaking amount or signer information.
+Taken together, these generalizations permit a useful application as a transaction protocol.
+If output public keys are considered as commitments to zero with Pedersen blinders set to the corresponding private keys, and each such public key comes equipped with a separate commitment to the output's amount, we can use a single Triptych proof to permit the spending of multiple outputs while detecting double-spending attempts and showing transaction balance without leaking amount or signer information.
 
 Triptych proofs are logarithmic in size with the number of possible signers, are efficient to verify using a single multiscalar multiplication operation, and can use delayed batch verification of arbitrary proofs for further efficiency gains.
 
 \subsection{Warning}
-There is currently no security model established for Triptych, and no proofs of security (except for correctness). This document currently serves only to describe the construction and its algorithms. It should not be considered secure or safe for use without extensive additional formalization and analysis. This is very early research that is still under active development.
+There is currently no security model established for Triptych, and no proofs of security (except for correctness).
+This document currently serves only to describe the construction and its algorithms.
+It should not be considered secure or safe for use without extensive additional formalization and analysis.
+This is very early research that is still under active development.
 
 
 \section{Algorithms}
-Let $\G$ be a cyclic group in which the discrete logarithm problem is hard, and let $\F$ be its scalar field. Let $\hs$ be a cryptographic hash function mapping arbitrary input to $\F$. Let $\hp$ be a cryptographic hash function mapping arbitrary input to $\G$. Assume that any point of the form $G_i$ or $H_i$ (possibly with multiple indices) is a generator of $\G$ whose discrete logarithm relationship with all other such points is unknown; in the case of elliptic curve groups, using an indexed $\hp$ operation is appropriate for these generators. Let $G, H$ be distinguished generators used for Pedersen commitments.
+Let $\G$ be a cyclic group in which the discrete logarithm problem is hard, and let $\F$ be its scalar field.
+Let $\hs$ be a cryptographic hash function mapping arbitrary input to $\F$.
+Let $\hp$ be a cryptographic hash function mapping arbitrary input to $\G$.
+Assume that any point of the form $G_i$ or $H_i$ (possibly with multiple indices) is a generator of $\G$ whose discrete logarithm relationship with all other such points is unknown; in the case of elliptic curve groups, using an indexed $\hp$ operation is appropriate for these generators.
+Let $G, H$ be distinguished generators used for Pedersen commitments.
 
-Assume that previously-generated transaction outputs are constructed as Pedersen commitments to zero, such that an output is of the form $M \equiv rG$. We do not consider here the method by which output keys are generated, but assume this is offloaded to another protocol. Each output comes equipped with an amount commitment $P \equiv sG + aH$, where $a$ is the amount and $s$ a blinding factor.
+Assume that previously-generated transaction outputs are constructed as Pedersen commitments to zero, such that an output is of the form $M \equiv rG$.
+We do not consider here the method by which output keys are generated, but assume this is offloaded to another protocol.
+Each output comes equipped with an amount commitment $P \equiv sG + aH$, where $a$ is the amount and $s$ a blinding factor.
 
-A user of the protocol wishes to spend $w$ distinct outputs $\{M_u\}_{u=0}^{w-1}$ for which it knows the corresponding private keys, and generate $T$ new outputs such that the amounts balance between input and output commitments. Further, it wishes to demonstrate to other users of the protocol that none of the $w$ outputs has been previously spent in another transaction.
+A user of the protocol wishes to spend $w$ distinct outputs $\{M_u\}_{u=0}^{w-1}$ for which it knows the corresponding private keys, and generate $T$ new outputs such that the amounts balance between input and output commitments.
+Further, it wishes to demonstrate to other users of the protocol that none of the $w$ outputs has been previously spent in another transaction.
 
-To obscure the set $\{M_i\}$ being spent in the transaction, the user includes a number of other outputs in the list, for which it does not necessarily know the private keys. Note this is a non-interactive process that does not require the participation of the owners of the other outputs.
+To obscure the set $\{M_i\}$ being spent in the transaction, the user includes a number of other outputs in the list, for which it does not necessarily know the private keys.
+Note this is a non-interactive process that does not require the participation of the owners of the other outputs.
 
-Suppose the user has such a list of $N$ outputs, randomly shuffled such that for $0 \leq u < w$, the quantity $0 \leq l^{(u)} < N$ represents the index of an output to be spent. Note that the mapping $u \mapsto l^{(u)}$ is one-to-one. We assume that $N = n^m$ for some $n,m$. In practice this is not a practical concern, since it is always possible to include additional outputs to the set. The user generates $T$ new outputs whose associated amount commitments are $\{Q_j\}_{j=0}^{T-1}$, and such that the input and output amounts balance between spent input commitments and newly-generated output commitments.
+Suppose the user has such a list of $N$ outputs, randomly shuffled such that for $0 \leq u < w$, the quantity $0 \leq l^{(u)} < N$ represents the index of an output to be spent.
+Note that the mapping $u \mapsto l^{(u)}$ is one-to-one.
+We assume that $N = n^m$ for some $n,m$.
+In practice this is not a practical concern, since it is always possible to include additional outputs to the set.
+The user generates $T$ new outputs whose associated amount commitments are $\{Q_j\}_{j=0}^{T-1}$, and such that the input and output amounts balance between spent input commitments and newly-generated output commitments.
 
 
 \subsection{Notation}
-For a three-dimensional tensor $f \equiv (f_{i,j,k}) \subset \F^3$ and blinding factor $r \in \F$, define the Pedersen tensor commitment $$\com(f,r) \equiv rH + \sum_{i,j,k} f_{i,j,k} G_{i,j,k}$$ using fixed independent generators as described above. Operations on tensors are assumed to be performed componentwise. The ordering of elements of $f$ is assumed to be known and canonical.
+For a three-dimensional tensor $f \equiv (f_{i,j,k}) \subset \F^3$ and blinding factor $r \in \F$, define the Pedersen tensor commitment $$\com(f,r) \equiv rH + \sum_{i,j,k} f_{i,j,k} G_{i,j,k}$$ using fixed independent generators as described above.
+Operations on tensors are assumed to be performed componentwise.
+The ordering of elements of $f$ is assumed to be known and canonical.
 
 For integers or scalars $i,j$, the Kronecker delta function $\delta(i,j)$ evaluates to $1$ if $i=j$ and $0$ otherwise, where the output is taken to be in the appropriate set.
 
-We sometimes use index subscript notation of the form $i_j$ to indicate the $j$ digit of $i$, where such a decomposition of $i$ is taken base $n$ with padded length $m$. That is, for $n=2$, this indexes a binary decomposition. This notation will be specified explicitly where confusion may occur.
+We sometimes use index subscript notation of the form $i_j$ to indicate the $j$ digit of $i$, where such a decomposition of $i$ is taken base $n$ with padded length $m$.
+That is, for $n=2$, this indexes a binary decomposition.
+This notation will be specified explicitly where confusion may occur.
 
 
 \subsection{Prover}
@@ -80,12 +105,15 @@ The prover algorithm accepts the following:
 The prover then performs these steps:
 \begin{itemize}
 \item Define $\left\{J^{(u)}\right\}_{u=0}^{w-1} \subset \G$ such that $J^{(u)} \equiv (r^{(u)})^{-1}\hp(M_{l_u})$.
-\item Select random $r_A \in \F$ and $\left\{a^{(u)}_{j,i}\right\}_{i=1,j,u=0}^{n-1,m-1,w-1} \subset \F^3$. Define $A \equiv \com(a,r_A)$.
-\item Define $\left\{\sigma^{(u)}_{j,i}\right\}_{i,j,u=0}^{n-1,j-1,w-1} \subset \F^3$ such that $\sigma^{(u)}_{j,i} \equiv \delta\left(l^{(u)}_j,i\right)$ (using our decomposition notation), and choose random $r_B \in \F$. Define $B \equiv \com(\sigma,r_B)$.
+\item Select random $r_A \in \F$ and $\left\{a^{(u)}_{j,i}\right\}_{i=1,j,u=0}^{n-1,m-1,w-1} \subset \F^3$.
+Define $A \equiv \com(a,r_A)$.
+\item Define $\left\{\sigma^{(u)}_{j,i}\right\}_{i,j,u=0}^{n-1,j-1,w-1} \subset \F^3$ such that $\sigma^{(u)}_{j,i} \equiv \delta\left(l^{(u)}_j,i\right)$ (using our decomposition notation), and choose random $r_B \in \F$.
+Define $B \equiv \com(\sigma,r_B)$.
 \item Select random $r_C \in \F$, and define $C \equiv \com(a(1-2\sigma), r_C)$.
 \item Select random $r_D \in \F$, and define $D \equiv \com(-a^2, r_D)$.
 \item Select random $\left\{\rho^{(u)}_j\right\}_{j,u=0}^{m-1,w-1} \subset \F^2$.
-\item For each $0 \leq u < w$, define coefficients $\left\{p^{(u)}_{k,j}\right\}_{k,j=0}^{N-1,m-1}$ such that $$p^{(u)}_k(x) \equiv \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} = \delta\left(l^{(u)},k\right)x^m + \sumj p^{(u)}_{k,j}x^j$$ (using our decomposition notation). Then define $p_{k,j} \equiv \sumu p^{(u)}_{k,j}$ and $p_k(x) \equiv \sumu p^{(u)}_k(x)$ accordingly.
+\item For each $0 \leq u < w$, define coefficients $\left\{p^{(u)}_{k,j}\right\}_{k,j=0}^{N-1,m-1}$ such that $$p^{(u)}_k(x) \equiv \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} = \delta\left(l^{(u)},k\right)x^m + \sumj p^{(u)}_{k,j}x^j$$ (using our decomposition notation).
+Then define $p_{k,j} \equiv \sumu p^{(u)}_{k,j}$ and $p_k(x) \equiv \sumu p^{(u)}_k(x)$ accordingly.
 \item Define $\{X_j\}_{j=0}^{m-1} \subset \G$ such that: $$X_j \equiv \sumk p_{k,j}M_k + \sumu \rho^{(u)}_jG$$
 \item Define $\{Y_j\}_{j=0}^{m-1} \subset \G$ such that: $$Y_j \equiv \sumk p_{k,j}\hp(M_k) + \sumu \rho^{(u)}_jJ^{(u)}$$
 \item Define $\{Z_j\}_{j=0}^{m-1} \subset \G$ such that: $$Z_j \equiv \sumk p_{k,j}P_k + \sumu \rho^{(u)}_jG$$
@@ -109,9 +137,11 @@ The verifier accepts the following:
 \item a proof generated by a prover
 \end{itemize}
 
-All prover-supplied elements are checked to ensure their membership in the proper set (either the scalar field $\F$ or the group $\G$, as appropriate). The verifier uses the public parameters and proof elements to construct the Fiat-Shamir transcript challenge $x$, and then performs these steps:
+All prover-supplied elements are checked to ensure their membership in the proper set (either the scalar field $\F$ or the group $\G$, as appropriate).
+The verifier uses the public parameters and proof elements to construct the Fiat-Shamir transcript challenge $x$, and then performs these steps:
 \begin{itemize}
-\item Ensure that each $J^{(u)}$ is unique for $0 \leq u < w$. Reject otherwise.
+\item Ensure that each $J^{(u)}$ is unique for $0 \leq u < w$.
+Reject otherwise.
 \item For all $0 \leq u < w$ and $0 \leq j < m$, set: $$f^{(u)}_{j,0} \equiv x - \sum_{i=1}^{n-1} f^{(u)}_{j,i}$$
 \item{($A/B$ check)} Check that $\com(f,z_A) = A + xB$ and reject otherwise.
 \item{($C/D$ check)} Check that $\com(f(x-f),z_C) = xC + D$ and reject otherwise.
@@ -163,11 +193,18 @@ Finally, the $Z$-check:
 
 
 \section{Optimizations}
-We note that all verifier checks can be reduced to multiscalar multiplications yielding the identity element in $\G$, and that the tensor commitment $A/B$ and $C/D$ checks have the same number of elements if the parameters $n,m,u$ are assumed to be fixed. This means the verifier can verify all such commitments (whether part of the same proof or not) by combining scalars across common generators using a set of verifier-selected random weighting factors. This combination of commitments may be similarly weight-combined with the $X,Y,Z$ checks. The end result is that a collection of arbitrary proofs may be verified using a single multiscalar multiplication operation, with common generators reused as they appear.
+We note that all verifier checks can be reduced to multiscalar multiplications yielding the identity element in $\G$, and that the tensor commitment $A/B$ and $C/D$ checks have the same number of elements if the parameters $n,m,u$ are assumed to be fixed.
+This means the verifier can verify all such commitments (whether part of the same proof or not) by combining scalars across common generators using a set of verifier-selected random weighting factors.
+This combination of commitments may be similarly weight-combined with the $X,Y,Z$ checks.
+The end result is that a collection of arbitrary proofs may be verified using a single multiscalar multiplication operation, with common generators reused as they appear.
 
 Several algorithms exist for evaluating multiscalar multiplications more efficiently than a straightforward multiply-then-add arrangement, reducing the overall time complexity of a multiscalar multiplication with $N$ terms as low as $O(N/\log(N))$, such as the Straus \cite{straus} and Pippenger \cite{pippenger} families of algorithms.
 
-Further, note that newly-generated output commitments must come equipped with range proofs demonstrating that amounts lie within a range sufficiently below $|\G|$ to avoid overflow. The Bulletproofs range proof construction is particularly efficient for this purpose \cite{bulletproofs}. It too supports delayed batch verification of the same type discussed here, offering additional optimizations. In particular, combining the fixed generators from the Bulletproofs public parameters with the fixed generators in Triptych can further reduce the time complexity of verification. The size of Bulletproofs range proofs is logarithmic in the product of the number of bits in the range and the number of outputs generated.
+Further, note that newly-generated output commitments must come equipped with range proofs demonstrating that amounts lie within a range sufficiently below $|\G|$ to avoid overflow.
+The Bulletproofs range proof construction is particularly efficient for this purpose \cite{bulletproofs}.
+It too supports delayed batch verification of the same type discussed here, offering additional optimizations.
+In particular, combining the fixed generators from the Bulletproofs public parameters with the fixed generators in Triptych can further reduce the time complexity of verification.
+The size of Bulletproofs range proofs is logarithmic in the product of the number of bits in the range and the number of outputs generated.
 
 
 \bibliographystyle{plain}
