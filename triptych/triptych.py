@@ -53,7 +53,6 @@ def com_tensor(v,r):
 
 # Decompose a value with given base and size
 def decompose(val,base,size,t=int):
-    temp_val = val # for reconstruction testing
     r = []
     for i in range(size-1,-1,-1):
         slot = base**i
@@ -99,27 +98,32 @@ def convolve(x,y,size=None):
 #  l: list of indices such that each M[l[i]] is a commitment to zero
 #  r: list of Pedersen blinders for all M[l[i]]
 #  s: list of Pedersen blinders for all P[l[i]]
-#  t: list of Pedersen blinders for all Q[l[i]]
+#  t: list of Pedersen blinders for all Q[i]
 #  a: list of Pedersen values for all P[l[i]]
-#  b: list of Pedersen values for all Q[l[i]]
+#  b: list of Pedersen values for all Q[i]
 #  m: dimension such that len(M) == 2**m
 # RETURNS
 #  proof structure
 def prove(M,P,Q,l,r,s,t,a,b,m):
     n = 2 # binary decomposition
 
-    # Size check
+    # Commitment list size check
     if not len(M) == n**m or not len(P) == n**m:
-        raise IndexError('Bad size decomposition!')
+        raise IndexError('Input size mismatch!')
+    if not len(l) == len(r) or not len(l) == len(s) or not len(l) == len(a):
+        raise IndexError('Input size mismatch!')
+    if not len(Q) == len(t) or not len(Q) == len(b):
+        raise IndexError('Output size mismatch!')
     N = len(M)
 
     # Reconstruct the known commitments
-    if not len(l) == len(r) or not len(l) == len(s):
-        raise IndexError('Index/blinder size mismatch!')
     w = len(l)
     for i in range(w):
-        if not M[l[i]] == r[i]*G:
-            raise ValueError('Bad commitment blinder!')
+        if not M[l[i]] == r[i]*G or not P[l[i]] == s[i]*G + a[i]*H:
+            raise ValueError('Bad input commitment!')
+    for j in range(len(Q)):
+        if not Q[j] == t[j]*G + b[j]*H:
+            raise ValueError('Bad output commitment!')
 
     # Construct key images
     J = []
