@@ -94,12 +94,12 @@ def convolve(x,y,size=None):
 #  M: public key list
 #  P: input commitment list
 #  Q: output commitment list
-#  l: list of indices such that each M[l[i]] is a commitment to zero
-#  r: list of Pedersen blinders for all M[l[i]]
-#  s: list of Pedersen blinders for all P[l[i]]
-#  t: list of Pedersen blinders for all Q[i]
-#  a: list of Pedersen values for all P[l[i]]
-#  b: list of Pedersen values for all Q[i]
+#  l: list of indices such that each M[l[u]] is a commitment to zero
+#  r: list of Pedersen blinders for all M[l[u]]
+#  s: list of Pedersen blinders for all P[l[u]]
+#  t: list of Pedersen blinders for all Q[j]
+#  a: list of Pedersen values for all P[l[u]]
+#  b: list of Pedersen values for all Q[j]
 #  m: dimension such that len(M) == 2**m
 # RETURNS
 #  proof structure
@@ -117,8 +117,8 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
 
     # Reconstruct the known commitments
     w = len(l)
-    for i in range(w):
-        if not M[l[i]] == r[i]*G or not P[l[i]] == s[i]*G + a[i]*H:
+    for u in range(w):
+        if not M[l[u]] == r[u]*G or not P[l[u]] == s[u]*G + a[u]*H:
             raise ValueError('Bad input commitment!')
     for j in range(len(Q)):
         if not Q[j] == t[j]*G + b[j]*H:
@@ -126,8 +126,8 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
 
     # Construct key images
     J = []
-    for i in range(w):
-        J.append(r[i].invert()*hash_to_point(M[l[i]]))
+    for u in range(w):
+        J.append(r[u].invert()*hash_to_point(M[l[u]]))
 
     # Prepare matrices and corresponding blinders
     rA = random_scalar()
@@ -192,12 +192,13 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
     X = [dumb25519.Z for _ in range(m)]
     Y = [dumb25519.Z for _ in range(m)]
     Z = [dumb25519.Z for _ in range(m)]
+    mu = [hash_to_scalar(i,M,P,Q,J,A,B,C,D) for i in range(N)] # aggregation coefficients
     rho_R = [[random_scalar() for _ in range(m)] for _ in range(w)]
     rho_S = [[random_scalar() for _ in range(m)] for _ in range(w)]
     for j in range(m):
         for i in range(N):
-            X[j] += M[i]*p[0][i][j]
-            Y[j] += hash_to_point(M[i])*p[0][i][j]
+            X[j] += M[i]*p[0][i][j]*mu[i]
+            Y[j] += hash_to_point(M[i])*p[0][i][j]*mu[i]
             Z[j] += P[i]*p[0][i][j]
         for u in range(w):
             X[j] += rho_R[u][j]*G
@@ -229,7 +230,7 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
     zR = []
     zS = Scalar(0)
     for u in range(w):
-        zR.append(r[u]*x**m)
+        zR.append(mu[l[u]]*r[u]*x**m)
         zS += s[u]*x**m
     for j in range(m):
         for u in range(w):
@@ -303,6 +304,7 @@ def verify(M,P,Q,proof,m):
     RX = dumb25519.Z
     RY = dumb25519.Z
     RZ = dumb25519.Z
+    mu = [hash_to_scalar(i,M,P,Q,J,A,B,C,D) for i in range(N)] # aggregation coefficients
     for i in range(N):
         t = [Scalar(1) for _ in range(w)]
         decomp_i = decompose(i,n,m)
@@ -310,8 +312,8 @@ def verify(M,P,Q,proof,m):
             for u in range(w):
                 t[u] *= f[u][j][decomp_i[j]]
         for u in range(w):
-            RX += M[i]*t[u]
-            RY += hash_to_point(M[i])*t[u]
+            RX += M[i]*t[u]*mu[i]
+            RY += hash_to_point(M[i])*t[u]*mu[i]
             RZ += P[i]*t[u]
 
     for j in range(m):

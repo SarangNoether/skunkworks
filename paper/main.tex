@@ -114,13 +114,14 @@ Define $B \equiv \com(\sigma,r_B)$.
 \item Select random $\left\{\rho^{(u)}_j\right\}_{j,u=0}^{m-1,w-1}, \left\{\overline{\rho}^{(u)}_j\right\}_{j,u=0}^{m-1,w-1} \subset \F$.
 \item For each $0 \leq u < w$, define coefficients $\left\{p^{(u)}_{k,j}\right\}_{k,j=0}^{N-1,m-1}$ such that $$p^{(u)}_k(x) \equiv \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} = \delta\left(l^{(u)},k\right)x^m + \sumj p^{(u)}_{k,j}x^j$$ (using our decomposition notation).
 Then define $p_{k,j} \equiv \sumu p^{(u)}_{k,j}$ and $p_k(x) \equiv \sumu p^{(u)}_k(x)$ accordingly.
-\item Define $\{X_j\}_{j=0}^{m-1} \subset \G$ such that: $$X_j \equiv \sumk p_{k,j}M_k + \sumu \rho^{(u)}_jG$$
-\item Define $\{Y_j\}_{j=0}^{m-1} \subset \G$ such that: $$Y_j \equiv \sumk p_{k,j}\hp(M_k) + \sumu \rho^{(u)}_jJ^{(u)}$$
+\item Define aggregation coefficients $\{\mu_k\}_{k=0}^{N-1}$ using a $k$-indexed $\hs$ operation, containing all public parameters and proof elements.
+\item Define $\{X_j\}_{j=0}^{m-1} \subset \G$ such that: $$X_j \equiv \sumk p_{k,j}\mu_kM_k + \sumu \rho^{(u)}_jG$$
+\item Define $\{Y_j\}_{j=0}^{m-1} \subset \G$ such that: $$Y_j \equiv \sumk p_{k,j}\mu_k\hp(M_k) + \sumu \rho^{(u)}_jJ^{(u)}$$
 \item Define $\{Z_j\}_{j=0}^{m-1} \subset \G$ such that: $$Z_j \equiv \sumk p_{k,j}P_k + \sumu \overline{\rho}^{(u)}_jG$$
 \item Define the Fiat-Shamir transcript challenge $x \in \F$ computed using all public parameters and these elements (with set notation dropped for brevity): $$M,P,Q,J,A,B,C,D,X,Y,Z$$
 \item Define $\left\{f^{(u)}_{j,i}\right\}_{i=1,j,u=0}^{n-1,m-1,w-1}$ such that $f^{(u)}_{j,i} \equiv \sigma^{(u)}_{j,i}x + a^{(u)}_{j,i}$.
 \item Define $z_A \equiv r_A + xr_B$ and $z_C \equiv xr_C + r_D$.
-\item Define $\left\{z^{(u)}_R\right\}_{u=0}^{w-1} \subset \F$ such that: $$z^{(u)}_R \equiv r^{(u)}x^m - \sumj \rho^{(u)}_jx^j$$
+\item Define $\left\{z^{(u)}_R\right\}_{u=0}^{w-1} \subset \F$ such that: $$z^{(u)}_R \equiv \mu_{l^{(u)}}r^{(u)}x^m - \sumj \rho^{(u)}_jx^j$$
 \item Define: $$z_S \equiv x^m\left( \sumu s^{(u)} - \sum_{j=0}^{T-1} t_j \right) - \sumj \left(x^j \sumu \overline{\rho}^{(u)}_j\right)$$
 \end{itemize}
 
@@ -138,15 +139,15 @@ The verifier accepts the following:
 \end{itemize}
 
 All prover-supplied elements are checked to ensure their membership in the proper set (either the scalar field $\F$ or the group $\G$, as appropriate).
-The verifier uses the public parameters and proof elements to construct the Fiat-Shamir transcript challenge $x$, and then performs these steps:
+The verifier uses the public parameters and proof elements to construct the Fiat-Shamir transcript challenge $x$ and aggregation coefficients $\{\mu_k\}_{k=0}^{N-1}$, and then performs these steps:
 \begin{itemize}
 \item Ensure that each $J^{(u)}$ is unique for $0 \leq u < w$.
 Reject otherwise.
 \item For all $0 \leq u < w$ and $0 \leq j < m$, set: $$f^{(u)}_{j,0} \equiv x - \sum_{i=1}^{n-1} f^{(u)}_{j,i}$$
 \item{($A/B$ check)} Check that $\com(f,z_A) = A + xB$ and reject otherwise.
 \item{($C/D$ check)} Check that $\com(f(x-f),z_C) = xC + D$ and reject otherwise.
-\item{($X$ check)} Check that $$\sumk M_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jX_j - \sumu z^{(u)}_RG = 0$$ and reject otherwise.
-\item{($Y$ check)} Check that $$\sumk \hp(M_k) \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jY_j - \sumu z^{(u)}_RJ^{(u)} = 0$$ and reject otherwise.
+\item{($X$ check)} Check that $$\sumk \mu_kM_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jX_j - \sumu z^{(u)}_RG = 0$$ and reject otherwise.
+\item{($Y$ check)} Check that $$\sumk \mu_k\hp(M_k) \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jY_j - \sumu z^{(u)}_RJ^{(u)} = 0$$ and reject otherwise.
 \item{($Z$ check)} Check that $$\sumk P_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jZ_j - x^m\sum_{j=0}^{T-1} Q_j - z_SG = 0$$ and reject otherwise.
 \end{itemize}
 
@@ -164,21 +165,21 @@ The $C/D$ check succeeds similarly, using the identity $$\left(\sigma^{(u)}_{j,i
 
 To show the correctness of the $X$ check:
 \begin{eqnarray*}
-&& \sumk M_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jX_j - \sumu z^{(u)}_RG \\
-&=& \sumk M_k p_k(x) - \sumj x^j \left( \sumk p_{k,j}M_k + \sumu \rho^{(u)}_jG \right) - \sumu z^{(u)}_RG \\
-&=& \sumk M_k \left( p_k(x) - \sumj x^j p_{k,j} \right) - \sumj x^j \sumu \rho^{(u)}_jG - \sumu z^{(u)}_RG \\
-&=& \sumk M_k \left[ \sumu \delta\left( l^{(u)},k \right) \right] - \sumj x^j \sumu \rho^{(u)}_jG - \sumu\left[ r^{(u)}x^m - \sumj \rho^{(u)}_jx^j \right]G \\
-&=& x^m\sumu r^{(u)}G - \sumj x^j \sumu \rho^{(u)}_jG - x^m\sumu r^{(u)}G + \sumj x^j \sumu \rho^{(u)}_jG \\
+&& \sumk \mu_kM_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jX_j - \sumu z^{(u)}_RG \\
+&=& \sumk \mu_kM_k p_k(x) - \sumj x^j \left( \sumk p_{k,j}\mu_kM_k + \sumu \rho^{(u)}_jG \right) - \sumu z^{(u)}_RG \\
+&=& \sumk \mu_kM_k \left( p_k(x) - \sumj x^j p_{k,j} \right) - \sumj x^j \sumu \rho^{(u)}_jG - \sumu z^{(u)}_RG \\
+&=& \sumk \mu_kM_k \left[ \sumu \delta\left( l^{(u)},k \right) \right] - \sumj x^j \sumu \rho^{(u)}_jG - \sumu\left[ \mu_{l^{(u)}}r^{(u)}x^m - \sumj \rho^{(u)}_jx^j \right]G \\
+&=& x^m\sumu \mu_{l^{(u)}}r^{(u)}G - \sumj x^j \sumu \rho^{(u)}_jG - x^m\sumu \mu_{l^{(u)}}r^{(u)}G + \sumj x^j \sumu \rho^{(u)}_jG \\
 &=& 0
 \end{eqnarray*}
 
 The $Y$-check proceeds similarly, but with more irritating algebra:
 \begin{eqnarray*}
-&& \sumk \hp(M_k) \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jY_j - \sumu z^{(u)}_RJ^{(u)} \\
-&=& \sumk \hp(M_k) p_k(x) - \sumj x^j \left( \sumk p_{k,j}\hp(M_k) + \sumu \rho^{(u)}_jJ^{(u)} \right) - \sumu z^{(u)}_RJ^{(u)} \\
-&=& \sumk \hp(M_k) \left( p_k(x) - \sumj x^j p_{k,j} \right) - \sumj x^j \sumu \rho^{(u)}_jJ^{(u)} - \sumu z^{(u)}_RJ^{(u)} \\
-&=& \sumk \hp(M_k) \left[ \sumu \delta\left( l^{(u)},k \right) \right] - \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}\hp(M_{l^{(u)}}) - \sumu\left[ r^{(u)}x^m - \sumj \rho^{(u)}_jx^j \right](r^{(u)})^{-1}\hp(M_{l^{(u)}}) \\
-&=& x^m\sumu \hp(M_{l^{(u)}}) - \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}\hp(M_{l^{(u)}}) - x^m\sumu \hp(M_{l^{(u)}}) + \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}\hp(M_{l^{(u)}}) \\
+&& \sumk \mu_k\hp(M_k) \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jY_j - \sumu z^{(u)}_RJ^{(u)} \\
+&=& \sumk \mu_k\hp(M_k) p_k(x) - \sumj x^j \left( \sumk p_{k,j}\mu_k\hp(M_k) + \sumu \rho^{(u)}_jJ^{(u)} \right) - \sumu z^{(u)}_RJ^{(u)} \\
+&=& \sumk \mu_k\hp(M_k) \left( p_k(x) - \sumj x^j p_{k,j} \right) - \sumj x^j \sumu \rho^{(u)}_jJ^{(u)} - \sumu z^{(u)}_RJ^{(u)} \\
+&=& \sumk \mu_k\hp(M_k) \left[ \sumu \delta\left( l^{(u)},k \right) \right] - \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}\hp(M_{l^{(u)}}) - \sumu\left[ \mu_{l^{(u)}}r^{(u)}x^m - \sumj \rho^{(u)}_jx^j \right](r^{(u)})^{-1}\hp(M_{l^{(u)}}) \\
+&=& x^m\sumu \mu_{l^{(u)}}\hp(M_{l^{(u)}}) - \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}\hp(M_{l^{(u)}}) - x^m\sumu \mu_{l^{(u)}}\hp(M_{l^{(u)}}) + \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}\hp(M_{l^{(u)}}) \\
 &=& 0
 \end{eqnarray*}
 
