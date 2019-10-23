@@ -1,5 +1,4 @@
 # Proof-of-concept implementation of https://github.com/monero-project/research-lab/issues/56
-# This version proves knowledge of one or more commitments to zero in a list, with key images and amount commitments
 
 from dumb25519 import hash_to_point, random_scalar, Scalar, hash_to_scalar, G, random_point, Z
 import dumb25519
@@ -193,16 +192,17 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
     X = [dumb25519.Z for _ in range(m)]
     Y = [dumb25519.Z for _ in range(m)]
     Z = [dumb25519.Z for _ in range(m)]
-    rho = [[random_scalar() for _ in range(m)] for _ in range(w)]
+    rho_R = [[random_scalar() for _ in range(m)] for _ in range(w)]
+    rho_S = [[random_scalar() for _ in range(m)] for _ in range(w)]
     for j in range(m):
         for i in range(N):
             X[j] += M[i]*p[0][i][j]
             Y[j] += hash_to_point(M[i])*p[0][i][j]
             Z[j] += P[i]*p[0][i][j]
         for u in range(w):
-            X[j] += rho[u][j]*G
-            Y[j] += rho[u][j]*J[u]
-            Z[j] += rho[u][j]*G
+            X[j] += rho_R[u][j]*G
+            Y[j] += rho_R[u][j]*J[u]
+            Z[j] += rho_S[u][j]*G
 
     # Partial proof
     proof = Proof()
@@ -233,8 +233,8 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
         zS += s[u]*x**m
     for j in range(m):
         for u in range(w):
-            zR[u] -= rho[u][j]*x**j
-            zS -= rho[u][j]*x**j
+            zR[u] -= rho_R[u][j]*x**j
+            zS -= rho_S[u][j]*x**j
     for i in range(len(t)):
         zS -= t[i]*x**m
 
