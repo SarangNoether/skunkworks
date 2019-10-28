@@ -167,16 +167,14 @@ def prove(data,N):
     l0 = aL - ScalarVector([z]*(M*N))
     l1 = sL
 
-    # ugly sum
+    # for polynomial coefficients
     zeros_twos = []
-    for i in range (M*N):
-        zeros_twos.append(Scalar(0))
-        for j in range(1,M+1):
-            temp = Scalar(0)
-            if i >= (j-1)*N and i < j*N:
-                temp = Scalar(2)**(i-(j-1)*N)
-            zeros_twos[-1] += temp*(z**(1+j))
-    
+    z_cache = z**2
+    for j in range(M):
+        for i in range(N):
+            zeros_twos.append(z_cache*2**i)
+        z_cache *= z
+
     # more polynomial coefficients
     r0 = aR + ScalarVector([z]*(M*N))
     r0 = r0*exp_scalar(y,M*N)
