@@ -35,8 +35,8 @@ Output obfuscated amounts | `T` | `T`
 Output transaction public keys | `T` | `T`
 Fee | `O(1)` | `O(1)`
 **`N = 128`, `M = T = 2`** | 3.26 kB | 2.21 kB
-**`N = 512`, `M = T = 2`** | 2.52 kB | 2.34 kB
-**`N = 1024', `M = T = 2`** | 3.65 kB | 2.40 kB
+**`N = 512`, `M = T = 2`** | 3.52 kB | 2.34 kB
+**`N = 1024`, `M = T = 2`** | 3.65 kB | 2.40 kB
 
 To examine verification complexity, let `k(i)` be the verification time required for an `i`-multiexponentiation operation. Let `B` be the number of transactions to verify in a batch; that is, set `B = 1` for verification of a single transaction.
 
