@@ -10,7 +10,7 @@ Important assumptions and notes:
 - anonymity set representation is not included in size computations
 - the key image format is different from the current Monero protocol, requiring a separation of outputs
 
-There are two different transaction protocols that can be built using RCT3. In one (here called RCT-single), separate spend proofs are used per transaction as needed. In the other (here called RCT-multi), a single spend proof is used per transaction; however, in this case the number of spends must be padded to a power of 2. Both versions have an established security model and proofs.
+There are two different transaction protocols that can be built using RCT3. In one (here called RCT3-single), separate spend proofs are used per transaction as needed. In the other (here called RCT3-multi), a single spend proof is used per transaction; however, in this case the number of spends must be padded to a power of 2. Both versions have an established security model and proofs.
 
 ## Spend transaction
 
@@ -43,13 +43,13 @@ To examine verification complexity, let `k(i)` be the verification time required
 Component | Unique generators
 --------- | -----------------
 Bulletproof | `B[T + 2lg(64T) + 4] + 128T`
-Spend proofs (RCT-single) | `B[2N + 2lg(N) + 11M] + 2N + 5`
+Spend proofs (RCT3-single) | `B[2N + 2lg(N) + 11M] + 2N + 5`
 Spend proof (RCT3-multi) | `B[2N + 2lg(MN) + M + T + 9] + (M + 1)N + 5`
 Balance proof (RCT3-single) | `B[T + M + 2]`
 
 We illustrate the practical time complexity for several representative parameters, and give the corresponding timing estimates from Monero performance test code.
 
-For RCT-single:
+For RCT3-single:
 
 `N` | `M` | `T` | `B` | Time complexity | Time/txn (ms)
 --- | --- | --- | --- | --------------- | -------------
@@ -57,7 +57,7 @@ For RCT-single:
 512 |   2 |   2 | 128 | `k(140805)`     | 44.1
 1024|   2 |   2 | 128 | `k(273157)`     | 84.8
 
-For RCT-multi:
+For RCT3-multi:
 
 `N` | `M` | `T` | `B` | Time complexity | Time/txn (ms)
 --- | --- | --- | --- | --------------- | -------------
