@@ -1,6 +1,6 @@
 # RingCT 3.0 analysis
 
-This analysis examines size and verification time estimates for the RingCT 3.0 (RCT3) transaction protocol. This protocol was developed by Tsz Hon Yuen et al. and described in a [preprint](https://eprint.iacr.org/2019/508).
+This analysis examines size and verification time estimates for the RingCT 3.0 (RCT3) transaction protocol. This protocol was developed by Tsz Hon Yuen et al. and described in a [preprint](https://eprint.iacr.org/2019/508). Monero Research Lab [proof-of-concept code](https://github.com/SarangNoether/skunkworks/tree/rct3) is also available, but should not be used in production.
 
 Important assumptions and notes:
 - only group operations are considered for timing purposes
