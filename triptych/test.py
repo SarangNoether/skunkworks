@@ -7,17 +7,6 @@ import random
 G = dumb25519.G
 H = dumb25519.hash_to_point('H')
 
-# Given a list of linking tags, determine if there are any duplicates
-# NOTE: this scales poorly
-#
-# INPUT
-#   tags: list of linking tags (Point list)
-# OUTPUT
-#   boolean: True if a duplicate exists, False otherwise
-def double_spend(tags):
-    return len(tags) != len(set(tags))
-
-
 class TestValidProofs(unittest.TestCase):
     def test_valid_prove_verify(self):
         print ''

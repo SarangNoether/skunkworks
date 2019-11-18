@@ -5,6 +5,7 @@ import dumb25519
 import random
 
 H = hash_to_point('H')
+U = hash_to_point('U')
 
 # Proof structure
 class Proof:
@@ -127,7 +128,7 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
     # Construct key images
     J = []
     for u in range(w):
-        J.append(r[u].invert()*hash_to_point(M[l[u]]))
+        J.append(r[u].invert()*U)
 
     # Prepare matrices and corresponding blinders
     rA = random_scalar()
@@ -198,7 +199,7 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
     for j in range(m):
         for i in range(N):
             X[j] += M[i]*p[0][i][j]*mu[i]
-            Y[j] += hash_to_point(M[i])*p[0][i][j]*mu[i]
+            Y[j] += U*p[0][i][j]*mu[i]
             Z[j] += P[i]*p[0][i][j]
         for u in range(w):
             X[j] += rho_R[u][j]*G
@@ -313,7 +314,7 @@ def verify(M,P,Q,proof,m):
                 t[u] *= f[u][j][decomp_i[j]]
         for u in range(w):
             RX += M[i]*t[u]*mu[i]
-            RY += hash_to_point(M[i])*t[u]*mu[i]
+            RY += U*t[u]*mu[i]
             RZ += P[i]*t[u]
 
     for j in range(m):
