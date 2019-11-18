@@ -4,12 +4,13 @@
 \usepackage[utf8]{inputenc}
 \usepackage{hyperref}
 
-\title{Triptych}
-\author{Sarang Noether and Arthur Blue}
+\title{Triptych: multiple inputs}
+\author{Sarang Noether}
 \date{\today}
 
 \newcommand{\G}{\mathbb{G}}
 \newcommand{\F}{\mathbb{F}}
+\newcommand{\N}{\mathbb{N}}
 \newcommand{\hs}{\mathsf{H}}
 \newcommand{\hp}{\mathcal{H}}
 \newcommand{\com}{\operatorname{Com}}
@@ -51,7 +52,8 @@ Let $\G$ be a cyclic group in which the discrete logarithm problem is hard, and 
 Let $\hs$ be a cryptographic hash function mapping arbitrary input to $\F$.
 Let $\hp$ be a cryptographic hash function mapping arbitrary input to $\G$.
 Assume that any point of the form $G_i$ or $H_i$ (possibly with multiple indices) is a generator of $\G$ whose discrete logarithm relationship with all other such points is unknown; in the case of elliptic curve groups, using an indexed $\hp$ operation is appropriate for these generators.
-Let $G, H$ be distinguished generators used for Pedersen commitments.
+Let $G, H$ be distinguished generators of $\G$ used for Pedersen commitments.
+Let $U$ be a distinguished generator of $\G$.
 
 Assume that previously-generated transaction outputs are constructed as Pedersen commitments to zero, such that an output is of the form $M \equiv rG$.
 We do not consider here the method by which output keys are generated, but assume this is offloaded to another protocol.
@@ -92,11 +94,11 @@ The prover algorithm accepts the following:
 \item a set of private keys $\{r^{(u)}\}_{u=0}^{w-1} \subset \F$
 \item a set of commitment amounts and blinding factors $\{(s^{(u)},a_u)\}_{u=0}^{w-1} \subset \F$
 \item a set of linking tags $\left\{J^{(u)}\right\}_{u=0}^{w-1} \subset \G$
-\item a set $\{l^{(u)}\}_{u=0}^{w-1} \subset \F$
+\item a set $\{l^{(u)}\}_{u=0}^{w-1} \subset \N$
 \begin{itemize}
 \item each $M_{l^{(u)}} = r^{(u)}G$ has its private key known to the prover
 \item each $P_{l^{(u)}} = s^{(u)}G + a_uH$ has its amount and blinding factor known to the prover
-\item each $J^{(u)} = (r^{(u)})^{-1}\hp(M_{l_u})$
+\item each $J^{(u)} = (r^{(u)})^{-1}U$
 \end{itemize}
 \item a set of new amount commitments $\{Q_j\}_{j=0}^{T-1} \subset \G$
 \item a set of commitment amounts and blinding factors $\{(t_j,b_j)\}_{j=0}^{T-1} \subset \F$ such that:
@@ -119,7 +121,7 @@ Define $B \equiv \com(\sigma,r_B)$.
 Then define $p_{k,j} \equiv \sumu p^{(u)}_{k,j}$ and $p_k(x) \equiv \sumu p^{(u)}_k(x)$ accordingly.
 \item Define aggregation coefficients $\{\mu_k\}_{k=0}^{N-1}$ using a $k$-indexed $\hs$ operation, containing all public parameters and proof elements.
 \item Define $\{X_j\}_{j=0}^{m-1} \subset \G$ such that: $$X_j \equiv \sumk p_{k,j}\mu_kM_k + \sumu \rho^{(u)}_jG$$
-\item Define $\{Y_j\}_{j=0}^{m-1} \subset \G$ such that: $$Y_j \equiv \sumk p_{k,j}\mu_k\hp(M_k) + \sumu \rho^{(u)}_jJ^{(u)}$$
+\item Define $\{Y_j\}_{j=0}^{m-1} \subset \G$ such that: $$Y_j \equiv \sumk p_{k,j}\mu_kU + \sumu \rho^{(u)}_jJ^{(u)}$$
 \item Define $\{Z_j\}_{j=0}^{m-1} \subset \G$ such that: $$Z_j \equiv \sumk p_{k,j}P_k + \sumu \overline{\rho}^{(u)}_jG$$
 \item Define the Fiat-Shamir transcript challenge $x \in \F$ computed using all public parameters and these elements (with set notation dropped for brevity): $$M,P,Q,J,A,B,C,D,X,Y,Z$$
 \item Define $\left\{f^{(u)}_{j,i}\right\}_{i=1,j,u=0}^{n-1,m-1,w-1}$ such that $f^{(u)}_{j,i} \equiv \sigma^{(u)}_{j,i}x + a^{(u)}_{j,i}$.
@@ -151,7 +153,7 @@ Reject otherwise.
 \item{($A/B$ check)} Check that $\com(f,z_A) = A + xB$ and reject otherwise.
 \item{($C/D$ check)} Check that $\com(f(x-f),z_C) = xC + D$ and reject otherwise.
 \item{($X$ check)} Check that $$\sumk \mu_kM_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jX_j - \sumu z^{(u)}_RG = 0$$ and reject otherwise.
-\item{($Y$ check)} Check that $$\sumk \mu_k\hp(M_k) \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jY_j - \sumu z^{(u)}_RJ^{(u)} = 0$$ and reject otherwise.
+\item{($Y$ check)} Check that $$\sumk \mu_kU \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jY_j - \sumu z^{(u)}_RJ^{(u)} = 0$$ and reject otherwise.
 \item{($Z$ check)} Check that $$\sumk P_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jZ_j - x^m\sum_{j=0}^{T-1} Q_j - z_SG = 0$$ and reject otherwise.
 \end{itemize}
 
@@ -182,11 +184,11 @@ To show the correctness of the $X$ check:
 
 The $Y$-check proceeds similarly, but with more irritating algebra:
 \begin{eqnarray*}
-&& \sumk \mu_k\hp(M_k) \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jY_j - \sumu z^{(u)}_RJ^{(u)} \\
-&=& \sumk \mu_k\hp(M_k) p_k(x) - \sumj x^j \left( \sumk p_{k,j}\mu_k\hp(M_k) + \sumu \rho^{(u)}_jJ^{(u)} \right) - \sumu z^{(u)}_RJ^{(u)} \\
-&=& \sumk \mu_k\hp(M_k) \left( p_k(x) - \sumj x^j p_{k,j} \right) - \sumj x^j \sumu \rho^{(u)}_jJ^{(u)} - \sumu z^{(u)}_RJ^{(u)} \\
-&=& \sumk \mu_k\hp(M_k) \left[ x^m \sumu \delta\left( l^{(u)},k \right) \right] - \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}\hp(M_{l^{(u)}}) - \sumu\left[ \mu_{l^{(u)}}r^{(u)}x^m - \sumj \rho^{(u)}_jx^j \right](r^{(u)})^{-1}\hp(M_{l^{(u)}}) \\
-&=& x^m\sumu \mu_{l^{(u)}}\hp(M_{l^{(u)}}) - \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}\hp(M_{l^{(u)}}) - x^m\sumu \mu_{l^{(u)}}\hp(M_{l^{(u)}}) + \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}\hp(M_{l^{(u)}}) \\
+&& \sumk \mu_kU \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jY_j - \sumu z^{(u)}_RJ^{(u)} \\
+&=& \sumk \mu_kU p_k(x) - \sumj x^j \left( \sumk p_{k,j}\mu_kU + \sumu \rho^{(u)}_jJ^{(u)} \right) - \sumu z^{(u)}_RJ^{(u)} \\
+&=& \sumk \mu_kU \left( p_k(x) - \sumj x^j p_{k,j} \right) - \sumj x^j \sumu \rho^{(u)}_jJ^{(u)} - \sumu z^{(u)}_RJ^{(u)} \\
+&=& \sumk \mu_kU \left[ x^m \sumu \delta\left( l^{(u)},k \right) \right] - \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}U - \sumu\left[ \mu_{l^{(u)}}r^{(u)}x^m - \sumj \rho^{(u)}_jx^j \right](r^{(u)})^{-1}U \\
+&=& x^m\sumu \mu_{l^{(u)}}U - \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}U - x^m\sumu \mu_{l^{(u)}}U + \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}U \\
 &=& 0
 \end{eqnarray*}
 
@@ -208,6 +210,7 @@ First, observe that the simulator presented in the proof of Lemma 1 in \cite{boo
 If the simulator chooses $B \in \G$ randomly, the cited lemma assures us a valid simulation of the proof elements $A,C,D,z_A,z_C,\{f^{(u)}_{j,i \neq 0}\}$; we may compute each $f^{(u)}_{j,0}$ from here.
 Further, in a valid proof, $B$ is independent and uniformly distributed as well.
 
+%The decisional Diffie-Hellman assumption implies that the elements {Xj} and {Yj} are independent and uniformly distributed in a valid proof" should be changed to "The selection of random \rho values and the computation of each \mu_k and H(M_k) under the random oracle model imply that X, Y, and Z are statistically uniform and independent..." or something like that. DDH is a worse
 The decisional Diffie-Hellman assumption implies that the elements $\{X_j\}_{j=1}^{m-1}, \{Y_j\}_{j=1}^{m-1}, \{Z_j\}_{j=1}^{m-1}$ are independent and uniformly distributed in a valid proof, so the simulator may choose these randomly.
 The verification checks require that $X_0,Y_0,Z_0$ be uniquely determined by the other elements in the corresponding sets in both real proofs and by the simulator.
 
@@ -221,10 +224,12 @@ To show this, we construct an extractor that, given $m+1$ valid responses to $m+
 In particular, we produce a modified witness for the following relation that is based on the information presented in the prover algorithm:
 \begin{multline*}
 \left\{ \{M_k\}_{k=0}^{N-1},\{P_k\}_{k=0}^{N-1},\{J^{(u)}\}_{u=0}^{w-1},\{Q_j\}_{j=0}^{T-1} \subset \G \: ; \: \left( \{l^{(u)}\}_{u=0}^{w-1}, r, y \right) : r = \sum_{u=0}^{w-1} \hs(l^{(u)},M,P,Q)r^{(u)} \text{ and } \right. \\
-\left. M_{l^{(u)}} = r_uG \; \forall \: u \in [0,w) \text{ and } r^{(u)}J^{(u)} = \hp(M_{l^{(u)}}) \; \forall \: u \in [0,w) \text{ and } \sum_{u=0}^{w-1} P_{l^{(u)}} - \sum_{j=0}^{T-1} Q_j = yG \right\}
+\left. M_{l^{(u)}} = r_uG \; \forall \: u \in [0,w) \text{ and } r^{(u)}J^{(u)} = U \; \forall \: u \in [0,w) \text{ and } \sum_{u=0}^{w-1} P_{l^{(u)}} - \sum_{j=0}^{T-1} Q_j = yG \right\}
 \end{multline*}
 
+% Since H is a random oracle, knowledge of r implies knowledge of {r^u} except with negligible probability
 Collision resistance of $\hs$ means that, with high probability, knowledge of $r$ is equivalent to knowledge of $\{r^{(u)}\}$.
+%  it's DL hardness on G together with the random oracle model
 The combination of the discrete logarithm problem on $\G$ and the collision-resistance of $\hp$ allows for double-spend enforcement using the linking tags $\{J^{(u)}\}$.
 The binding property of Pedersen commitments ensures that, for properly constructed commitments, knowledge of $y$ implies that the sum of values of input commitments $\{P_{l^{(u)}}\}$ balances the sum of output commitments $\{Q_j\}$.
 We may assume here that such commitments are correctly constructed, as this is shown by range proofs outside the scope of the proving system.
@@ -241,27 +246,29 @@ We have seen that $p_k$ is of degree $m$ only when $k \in \{l^{(u)}\}_{u=0}^{w-1
 Hence there exist coefficients $\{\overline{X}_j,\overline{Y}_j,\overline{Z}_j\}_{j=0}^{m-1}$, computed uniquely from the statement and extracted values, such that the verification equations are of the following form:
 \begin{eqnarray*}
 x^m \sumu \mu_{l^{(u)}}M_{l^{(u)}} + \sumj x^j\overline{X}_j &=& \left( \sumu z^{(u)}_R \right)G \\
-x^m \sumu \mu_{l^{(u)}}\hp(M_{l^{(u)}}) + \sumj x^j\overline{Y}_j &=& \sumu z^{(u)}_RJ^{(u)} \\
+x^m \sumu \mu_{l^{(u)}}U + \sumj x^j\overline{Y}_j &=& \sumu z^{(u)}_RJ^{(u)} \\
 x^m \sumu P_{l^{(u)}} + \sumj x^j\overline{Z}_j - x^m \sum_{j=0}^{T-1} Q_j &=& z_SG
 \end{eqnarray*}
 
 Construct a Vandermonde matrix $V$ where the $e$ row is the vector $(1,x_e,\ldots,x^m_e)$.
 Since all $x_e$ are distinct, the rows of $V$ span $\F^{m+1}$; hence there exist weights $\{\theta_e\}_{e=0}^m$ such that the resulting linear combination of rows produces the vector $(0,\ldots,0,1)$.
-That is, $\sum_{e=0}^m \theta_ex^j = \delta(j,m)$.
+That is, $\sum_{e=0}^m \theta_ex_e^j = \delta(j,m)$.
 
 For each verification equation, we can therefore build a linear combination over $e$. For the $X$-check:
-$$\sumu \mu_{l^{(u)}} M_{l^{(u)}} = \sum_{e=0}^m \theta_ex_e^m \left( \sumu \mu_{l^{(u)}} M_{l^{(u)}} \right) + \sum_{e=0}^m \theta_e \left( \sumj x_e^j \overline{X}_j \right) = \left[ \sum_{e=0}^m \theta_e \left( \sumu {}_ez^{(u)}_R \right) \right]G$$
-The rightmost bracketed double sum is therefore, with high probability, equal to $r = \mu_{l^{(u)}} r^{(u)}$.
+$$\sumu \mu_{l^{(u)}} M_{l^{(u)}} = \sum_{e=0}^m \theta_ex_e^m \left( \sumu \mu_{l^{(u)}} M_{l^{(u)}} \right) + \sum_{e=0}^m \theta_e \left( \sumj x_e^j \overline{X}_j \right) = \sumu \left( \sum_{e=0}^m \theta_e {}_ez^{(u)}_R \right) G$$
+The rightmost double sum of scalars is therefore, with high probability, equal to $r = \mu_{l^{(u)}} r^{(u)}$.
+
+\textbf{OPEN QUESTION:} Does it necessarily follow that $\sum_{e=0}^m \theta_e {}_ez^{(u)}_R = \mu_{l^{(u)}} r^{(u)}$ for each $u$?
 
 The $Z$-check proceeds similarly:
 $$\sumu P_{l^{(u)}} - \sum_{j=0}^{T-1} Q_j = \sum_{e=0}^m \theta_ex_e^m \left( \sumu P_{l^{(u)}} - \sum_{j=0}^{T-1} Q_j \right) + \sum_{e=0}^m \theta_e \left( \sumj x_e^j \overline{Z}_j \right) = \left( \sum_{e=0}^m \theta_e {}_ez_S  \right)G$$
 Hence we have $y \equiv \sum_{e=0}^m \theta_e {}_ez_S$.
 
 Unfortunately, the same technique does not appear to apply for the $Y$-check. Doing so obtains the following:
-$$\sumu \mu_{l^{(u)}} \hp(M_{l^{(u)}}) = \sum_{e=0}^m \theta_ex_e^m \left( \sumu \mu_{l^{(u)}} \hp(M_{l^{(u)}}) \right) + \sum_{e=0}^m \theta_e \left( \sumj x_e^j \overline{Y}_j \right) = \sumu \left( \sum_{e=0}^m \theta_e {}_ez^{(u)}_R \right) J^{(u)}$$
+$$\sumu \mu_{l^{(u)}} U = \sum_{e=0}^m \theta_ex_e^m \left( \sumu \mu_{l^{(u)}} U \right) + \sum_{e=0}^m \theta_e \left( \sumj x_e^j \overline{Y}_j \right) = \sumu \left( \sum_{e=0}^m \theta_e {}_ez^{(u)}_R \right) J^{(u)}$$
 It is unclear how to associate this with the required witness extraction.
 
-\textbf{Therefore, the special-soundness proof is incomplete!}
+\textbf{OPEN QUESTION:} Does the witness extraction from the previous open question imply that each linking tag satisfies the required relation?
 
 
 \section{Optimizations}
