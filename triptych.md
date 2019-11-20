@@ -22,7 +22,7 @@ To examine the size of a spend transaction, assume that `M` inputs are spent wit
 
 Component | Size (Triptych-single) | Size (Triptych-multi)
 --------- | ---------------------- | ---------------------
-Spend proof(s) | `M(4lg(N) + 8)` | `lg(N)(M + 3) + M + 7`
+Spend proof(s) | `M(3lg(N) + 8)` | `lg(N)(M + 3) + M + 7`
 Input key images | `M` | `M`
 Input auxiliary commitments | `M` | -
 Bulletproof range proof | `2lg(64T) + 10` | `2lg(64T) + 10`
@@ -31,16 +31,16 @@ Output public keys | `T` | `T`
 Output obfuscated amounts | `T` | `T`
 Output transaction public keys | `T` | `T`
 Fee | `O(1)` | `O(1)`
-**`N = 128`, `M = T = 2`** | 3.46 kB | 2.50 kB
-**`N = 512`, `M = T = 2`** | 3.97 kB | 2.82 kB
-**`N = 1024`, `M = T = 2`** | 4.22 kB | 2.98 kB
+**`N = 128`, `M = T = 2`** | 3.01 kB | 2.50 kB
+**`N = 512`, `M = T = 2`** | 3.39 kB | 2.82 kB
+**`N = 1024`, `M = T = 2`** | 3.58 kB | 2.98 kB
 
 To examine verification complexity, let `k(i)` be the verification time required for an `i`-multiexponentiation operation. Let `B` be the number of transactions to verify in a batch; that is, set `B = 1` for verification of a single transaction.
 
 Component | Unique generators
 --------- | -----------------
 Bulletproof | `B[T + 2lg(64T) + 4] + 128T`
-Spend proofs (Triptych-single) | `B[M(3lg(N) + 5) + 2N] + 2lg(N) + 2`
+Spend proofs (Triptych-single) | `B[M(2lg(N) + 6) + 2N] + 2lg(N) + 2`
 Balance check (Triptych-single) | `B[M + T]`
 Spend proof (Triptych-multi) | `(2 + M)lg(N) + 1 + B[2N + 3lg(N) + M + T]`
 
@@ -50,9 +50,9 @@ For Triptych-single:
 
 `N` | `M` | `T` | `B` | Time complexity | Time/txn (ms)
 --- | --- | --- | --- | --------------- | -------------
-128 |   2 |   2 | 128 | `k(42768)` | 13.6
-512 |   2 |   2 | 128 | `k(142612)` | 44.9
-1024|   2 |   2 | 128 | `k(274454)` | 86.2
+128 |   2 |   2 | 128 | `k(41232)` | 13.2
+512 |   2 |   2 | 128 | `k(140564)` | 44.5
+1024|   2 |   2 | 128 | `k(272150)` | 85.4
 
 For Triptych-multi:
 
