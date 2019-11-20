@@ -10,35 +10,33 @@ U = hash_to_point('U')
 # Proof structure
 class Proof:
     def __init__(self):
-        self.J = None # key images
+        self.J = None # key image
+        self.K = None
         self.A = None
         self.B = None
         self.C = None
         self.D = None
-        self.X = None # for signing key
+        self.X = None # for signing keys
         self.Y = None # for key image
-        self.Z = None # for amount
         self.f = None
         self.zA = None
         self.zC = None
-        self.zR = None # for signing key and key image
-        self.zS = None # for amount
+        self.z = None
 
     def __repr__(self):
         temp = '<TriptychProof> '
         temp += 'J:'+repr(self.J)+'|'
+        temp += 'K:'+repr(self.K)+'|'
         temp += 'A:'+repr(self.A)+'|'
         temp += 'B:'+repr(self.B)+'|'
         temp += 'C:'+repr(self.C)+'|'
         temp += 'D:'+repr(self.D)+'|'
         temp += 'X:'+repr(self.X)+'|'
         temp += 'Y:'+repr(self.Y)+'|'
-        temp += 'Z:'+repr(self.Z)+'|'
         temp += 'f:'+repr(self.f)+'|'
         temp += 'zA:'+repr(self.zA)+'|'
         temp += 'zC:'+repr(self.zC)+'|'
-        temp += 'zR:'+repr(self.zR)+'|'
-        temp += 'zS:'+repr(self.zS)
+        temp += 'z:'+repr(self.z)
         return temp
 
 # Pedersen matrix commitment
@@ -113,6 +111,7 @@ def prove(M,P,l,r,s,m):
 
     # Construct key image
     J = r.invert()*U
+    K = s*J
 
     # Prepare matrices and corresponding blinders
     rA = random_scalar()
@@ -162,31 +161,28 @@ def prove(M,P,l,r,s,m):
     # Generate proof values
     X = [dumb25519.Z for _ in range(m)]
     Y = [dumb25519.Z for _ in range(m)]
-    Z = [dumb25519.Z for _ in range(m)]
-    rho_R = [random_scalar() for _ in range(m)]
-    rho_S = [random_scalar() for _ in range(m)]
+    rho = [random_scalar() for _ in range(m)]
+    mu = hash_to_scalar(M,P,J,K,A,B,C,D)
     for j in range(m):
         for i in range(N):
-            X[j] += M[i]*p[i][j]
+            X[j] += (M[i]+mu*P[i])*p[i][j]
             Y[j] += U*p[i][j]
-            Z[j] += P[i]*p[i][j]
-        X[j] += rho_R[j]*G
-        Y[j] += rho_R[j]*J
-        Z[j] += rho_S[j]*G
+        X[j] += rho[j]*G
+        Y[j] += rho[j]*J
 
     # Partial proof
     proof = Proof()
     proof.J = J
+    proof.K = K
     proof.A = A
     proof.B = B
     proof.C = C
     proof.D = D
     proof.X = X
     proof.Y = Y
-    proof.Z = Z
 
     # Fiat-Shamir transcript challenge
-    x = hash_to_scalar(M,P,J,A,B,C,D,X,Y,Z)
+    x = hash_to_scalar(M,P,J,K,A,B,C,D,X,Y)
 
     f = [[None for _ in range(n)] for _ in range(m)]
     for j in range(m):
@@ -195,18 +191,15 @@ def prove(M,P,l,r,s,m):
 
     zA = rB*x + rA
     zC = rC*x + rD
-    zR = r*x**m
-    zS = s*x**m
+    z = (r + mu*s)*x**m
     for j in range(m):
-        zR -= rho_R[j]*x**j
-        zS -= rho_S[j]*x**j
+        z -= rho[j]*x**j
 
     # Assemble proof
     proof.f = f
     proof.zA = zA
     proof.zC = zC
-    proof.zR = zR
-    proof.zS = zS
+    proof.z = z
 
     return proof
 
@@ -224,21 +217,21 @@ def verify(M,P,proof,m):
     N = n**m
 
     J = proof.J
+    K = proof.K
     A = proof.A
     B = proof.B
     C = proof.C
     D = proof.D
     X = proof.X
     Y = proof.Y
-    Z = proof.Z
     f = proof.f
     zA = proof.zA
     zC = proof.zC
-    zR = proof.zR
-    zS = proof.zS
+    z = proof.z
 
     # Fiat-Shamir transcript challenge
-    x = hash_to_scalar(M,P,J,A,B,C,D,X,Y,Z)
+    mu = hash_to_scalar(M,P,J,K,A,B,C,D)
+    x = hash_to_scalar(M,P,J,K,A,B,C,D,X,Y)
 
     # A/B check
     for j in range(m):
@@ -259,29 +252,23 @@ def verify(M,P,proof,m):
     # Commitment check
     RX = dumb25519.Z
     RY = dumb25519.Z
-    RZ = dumb25519.Z
     for i in range(N):
         t = Scalar(1)
         decomp_i = decompose(i,n,m)
         for j in range(m):
             t *= f[j][decomp_i[j]]
-        RX += M[i]*t
-        RY += U*t
-        RZ += P[i]*t
+        RX += (M[i] + mu*P[i])*t
+        RY += (U + mu*K)*t
 
     for j in range(m):
         RX -= X[j]*x**j
         RY -= Y[j]*x**j
-        RZ -= Z[j]*x**j
-    RX -= zR*G
-    RY -= zR*J
-    RZ -= zS*G
+    RX -= z*G
+    RY -= z*J
 
     if not RX == dumb25519.Z:
         raise ArithmeticError('Failed signing key check!')
     if not RY == dumb25519.Z:
         raise ArithmeticError('Failed linking check!')
-    if not RZ == dumb25519.Z:
-        raise ArithmeticError('Failed balance key check!')
 
     return True
