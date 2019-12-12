@@ -200,6 +200,6 @@ test_x = Scalar(0)
 for i in range(PLAYERS):
     test_x += x[i]
 if not R == test_x.invert()*U:
-    raise('Final test failed')
+    raise ArithmeticError('Final test failed')
 
 print 'Success!'
