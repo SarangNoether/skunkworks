@@ -7,8 +7,9 @@ import random
 from dumb25519 import *
 
 MILLER_RABIN = 64 # number of Miller-Rabin tests
-PRIME_BITS = 256 # bits in primes used for keys
+PRIME_BITS = 256 # bits in primes used for Paillier keys
 PLAYERS = 3 # number of MPC players
+PAILLIER_TESTS = 0 # number of random Paillier tests to run
 
 print 'Testing MPC inversion with',PLAYERS,'players...'
 
@@ -96,10 +97,10 @@ class Key:
 
     # Decrypt a ciphertext `c`
     def decrypt(self,c):
-        return Scalar(((pow(c,self.phi,self.N**2) - 1)//self.N * invert(self.phi,self.N)) % self.N) # to Scalar type
+        return Scalar(((pow(c,self.phi,self.N**2) - 1)/self.N * invert(self.phi,self.N)) % self.N) # to Scalar type
 
-# Test keys and cryptography
-for _ in range(0):
+# Test Paillier correctness and homomorphicity
+for _ in range(PAILLIER_TESTS):
     key = Key()
     key.generate()
     m = random.randrange(key.N)
