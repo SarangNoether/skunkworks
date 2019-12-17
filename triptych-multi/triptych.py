@@ -3,6 +3,7 @@
 from dumb25519 import hash_to_point, random_scalar, Scalar, hash_to_scalar, G, random_point, Z
 import dumb25519
 import random
+import transcript
 
 H = hash_to_point('H')
 U = hash_to_point('U')
@@ -106,6 +107,7 @@ def convolve(x,y,size=None):
 #  proof structure
 def prove(M,P,Q,l,r,s,t,a,b,m):
     n = 2 # binary decomposition
+    tr = transcript.Transcript('Triptych multi-input')
 
     # Commitment list size check
     if not len(M) == n**m or not len(P) == n**m:
@@ -218,7 +220,18 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
     proof.Z = Z
 
     # Fiat-Shamir transcript challenge
-    x = hash_to_scalar(M,P,Q,J,A,B,C,D,X,Y,Z)
+    tr.update(M)
+    tr.update(P)
+    tr.update(Q)
+    tr.update(J)
+    tr.update(A)
+    tr.update(B)
+    tr.update(C)
+    tr.update(D)
+    tr.update(X)
+    tr.update(Y)
+    tr.update(Z)
+    x = tr.challenge()
 
     f = [[[None for _ in range(n)] for _ in range(m)] for _ in range(w)]
     for j in range(m):
@@ -262,6 +275,7 @@ def prove(M,P,Q,l,r,s,t,a,b,m):
 def verify(M,P,Q,proof,m):
     n = 2
     N = n**m
+    tr = transcript.Transcript('Triptych multi-input')
 
     J = proof.J
     A = proof.A
@@ -278,7 +292,18 @@ def verify(M,P,Q,proof,m):
     zS = proof.zS
 
     # Fiat-Shamir transcript challenge
-    x = hash_to_scalar(M,P,Q,J,A,B,C,D,X,Y,Z)
+    tr.update(M)
+    tr.update(P)
+    tr.update(Q)
+    tr.update(J)
+    tr.update(A)
+    tr.update(B)
+    tr.update(C)
+    tr.update(D)
+    tr.update(X)
+    tr.update(Y)
+    tr.update(Z)
+    x = tr.challenge()
 
     w = len(J)
 
