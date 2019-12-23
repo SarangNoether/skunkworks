@@ -1,7 +1,7 @@
 # RingCT 3.0 MPC
 
 This document briefly and informally describes how to produce an `n`-of-`n` multisignature using the [RingCT3.0](https://eprint.iacr.org/2019/508) (RCT3) proving system.
-Note that this process assumes the older single-input version of the proving system, with the appropriate exploit mitigations [applied](https://github.com/SarangNoether/skunkworks/tree/rct3).
+Note that this process assumes the older single-input version of the proving system, with the appropriate exploit mitigations [applied](https://github.com/SarangNoether/skunkworks/tree/rct3/rct3-single).
 
 Since an RCT3 transaction consists of multiple separate spend proofs with outputs known to all signers, it suffices to describe how to allow a group of `n` signers, each of whom has an additive share `r_i` of the signing secret key `r`, to collaboratively produce a proof.
 We note that the following method has not been formally analyzed for security; in particular, we assume only honest-but-curious players, who follow the multiparty computation (MPC) protocol, but may be interested to learn other players' secret data while doing so.
@@ -23,13 +23,13 @@ Each player `i` holds a secret share `r_i` of the secret key `r`, so that `r_1 +
 Further, each player `i` holds a Paillier secret key, the public key of which has previously been distributed to all other players.
 
 Each player `i` chooses a random scalar `g_i` and sets `G_i := g_i*U`.
-Player `i` then computes the quantity `c_i := E_i(x_i)`, where `E_i` represents Paillier encryption using the public key for player `i`, and sends `c_i` to each player `j`.
+Player `i` then computes the quantity `c_i := E_i(r_i)`, where `E_i` represents Paillier encryption using the public key for player `i`, and sends `c_i` to each player `j`.
 Player `j` chooses a random scalar `b_ji` for each such receipt.
-Player `j` computes `c_j := g_j*E_i(x_i) + E_i(-b_ji)` using Paillier homomorphicity, and sends `c_j` back to player `i`.
+Player `j` computes `c_j := g_j*c_i + E_i(-b_ji)` using Paillier homomorphicity, and sends `c_j` back to player `i`.
 Player `i` sets `a_ij := D_i(c_j)`, where `D_i` represents Paillier decryption using the secret key for player `i`.
 
 After all players have completed this exchange, each player `i` holds scalars `a_ij` and `b_ij` for each other player `j`.
-Each player `i` computes `d_i := x_i*g_i + Sum[a_ij + b_ij]`, where the sum is taken over all other `j`, and sends `d_i` and `G_i` to the dealer.
+Each player `i` computes `d_i := r_i*g_i + Sum[a_ij + b_ij]`, where the sum is taken over all other `j`, and sends `d_i` and `G_i` to the dealer.
 
 The dealer computes `d := d_1 + ... + d_n`.
 The dealer then computes `U' := 1/d*(G_1 + ... G_n)`; this is the shared key image `1/r*U`, which the dealer sends to all players.
