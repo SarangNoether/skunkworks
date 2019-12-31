@@ -39,7 +39,7 @@ Insecure example code demonstrating this computation is [available](https://gith
 ## Proof
 
 To proceed with the Triptych proof, each player `i` selects a random set of scalars `{rho_ij}` for `j = 0..m-1`, computes `{rho_ij*G}` and `{rho_ij*J}`, and sends the latter two sets of group elements to the dealer.
-For all `j`, the dealer computes `rho_i*G := rho_i1*G + ... + rho_in*G` and `rho_i*J := rho_i1*J + ... + rho_in*J`, and uses these values to compute each `X_j` and `Y_j` in the proof.
+For all `j`, the dealer computes `rho_j*G := rho_1j*G + ... + rho_nj*G` and `rho_j*J := rho_1j*J + ... + rho_nj*J`, and uses these values to compute each `X_j` and `Y_j` in the proof.
 The dealer computes the Fiat-Shamir transcript challenge `x` and sends it to all players.
 Each player `i` then computes `z_i := r_i*x^m - rho_i0*x^0 - ... - rho_i(m-1)*x^(m-1)` and sends it to the dealer.
 The dealer finishes the proof, setting `z := z_1 + ... + z_n + mu*s*x^m`.
