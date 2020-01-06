@@ -1,0 +1,659 @@
+\documentclass[draft]{llncs} % TODO: remove draft option
+\pagestyle{headings}
+
+\usepackage{enumerate}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+\usepackage[notcite]{showkeys} % TODO: remove showkeys
+\usepackage{lineno} % TODO: remove
+\linenumbers % TODO: remove
+
+\title{Concise Linkable Ring Signatures and Applications}
+\institute{Monero Research Lab, \email{\{surae,sarang\}@getmonero.org} \and Independent researcher, \email{randomrun@protonmail.com}}
+\author{Brandon Goodell\inst{1} \and Sarang Noether\inst{1} \and Arthur Blue\inst{2}}
+
+\begin{document}
+\maketitle
+
+
+\begin{abstract}
+We describe a generalization of linkable ring signatures, $d$-linkable ring signatures ($d$-LRS). These admit $d$-dimensional vectors of keys with a specified linking coordinate, but do not have signature sizes linear in $d$. We then produce an efficient $d$-LRS construction, called \textit{concise linkable spontaneous anonymous group} signatures (CLSAG), that are smaller than existing constructions without a trusted setup used in production, and are more efficient in verification over a reasonable range of anonymity set sizes. Security is proven using the $k$-one more discrete logarithm and decisional Diffie-Hellman hardness assumptions to show correctness, unforgeability, linkable anonymity, linkability, and non-frameability. We describe direct applications to signer-ambiguous confidential transactions with single or multiple asset classes.
+\end{abstract}
+
+
+\section{Introduction}
+
+First introduced in \cite{rivest} in the RSA setting and in \cite{liu} in the discrete logarithm setting, ring signatures permit message signing on behalf of a set of public keys rather than a single public key. Ring signatures see myriad applications ranging from lightweight anonymous authentication in \cite{yang2015lightweight} to transaction protocols like Monero in \cite{noether} and CryptoNote in \cite{van2013cryptonote}. A verifier is assured that the signer knows the private key of at least one of these public keys, which are called ring members. Ring signatures are anonymous or signer-ambiguous in the sense that the verifier does not learn information from the signature about which key is the signer. We stress that methods of practical analysis such as those of  \cite{moser2018empirical,quesnelle2017linkability} can exploit metadata in real-life applications of anonymous authentication protocols to reduce anonymity.
+
+Group signature constructions preceding \cite{rivest,liu} require some degree of interactivity, a fixed set of participants, a trusted group manager or other trusted setup, or hardness assumptions not based on the discrete logarithm problem. Since \cite{rivest}, ring signatures have enjoyed many improvements, extensions, and modifications. For example, ring signatures are constructed in the bilinear pairing setting in \cite{zhang2002id}, key structures are generalized in \cite{abe20021}, security definitions are improved in \cite{bender}, signature size is improved in \cite{fujisaki2011sub,gu2018constant}, and traceability is introduced in \cite{fujisaki2007traceable}.
+
+Linkable ring signatures were first introduced in \cite{liu}; in the context of transaction protocols, linkable ring signatures are the basis for anonymous transaction authentication. Linkable ring signatures guarantee that two signatures with the same ring on arbitrary messages can be publicly linked if signed using the same key. An implementation is presented in \cite{liu} in the discrete logarithm setting; that implementation functions for similar reasons as Schnorr signatures in \cite{schnorr1991efficient}.
+
+The signature linking tags in \cite{liu} are unsuitable for applications where signatures must be linked key-by-key, not ring-by-ring (such as for ``double-signing'' protection in a setting where users generate new keys over time and select \textit{ad hoc} ring members). Resistance to double-signing attempts is ensured using linking tags as described in \cite{van2013cryptonote} (therein called key images). More recent work of \cite{noether} extends the approach of \cite{liu} to enable an anonymous confidential transaction model with \textit{ad hoc} ring member selection. In \cite{noether}, transaction amounts are replaced with Pedersen commitments to amounts together with range proofs. Signatures are constructed from key vectors including differences of amount commitments as one of the keys. However, the proofs in \cite{noether} are informal and not based on rigorous security models.
+
+Alternatives to ring signatures like more general zero-knowledge proving systems typically require a trusted party to honestly perform a setup process (as in \cite{groth,ben2014succinct,groth2018updatable}) or lack practical efficiency for large circuits (as in \cite{bulletproofs}), meaning that such systems may not be appropriate for distributed ledger applications. However, more recent approaches such as \cite{bowehalo,hoffmann2019efficient} show both improvements to the trust requirement as well as improvements in efficiency.
+
+
+\subsection{Our contribution}
+
+We first introduce a formal definition of $d$-dimensional linkable ring signatures ($d$-LRS) as a generalization of linkable ring signatures (LRS). We present an implementation of a new $d$-LRS, $d$-concise linkable spontaneous anonymous group ($d$-CLSAG) signatures. These have $d$-dimensional keys, and signature size scales with the sum of ring size and the dimension $d$. Equivalent MLSAG signatures of \cite{noether} produce signatures that scale with the product of ring size and $d$ rather than the sum. Size efficiency comes from an aggregation of keys across key vector components, similar to the approach from \cite{maxwell2018simple,qian2010non}; this results in signatures that are about half the size of \cite{noether}, and can be generated and verified more quickly in practice.
+
+We describe linkable ring signatures, $d$-LRS constructions, and examples in Section \ref{sec:lrs}. We present our $d$-CLSAG construction in Section \ref{sec:construction} and discuss its efficiency. The security model and main results are presented in Section \ref{sec:security}. We produce informal descriptions of signer-ambiguous confidential transaction applications for single and multiple asset types in Section \ref{sec:applications}. Security proof are presented in Appendix \ref{app:proofs}.
+
+Notably, we provide a new definition for unforgeability in linkable ring signatures that takes into account both insider corruption and forgeries from partially-corrupted rings. We prove that $d$-CLSAG signatures are unforgeable under the hardness of the $k$-one-more discrete logarithm ($k$-OMDL) problem under this definition in the random oracle model, and show that  the properties of linkability and non-frameability follow from unforgeability. We show that linkable anonymity reduces to the hardness of a form of the decisional Diffie-Hellman (DDH) problem.
+
+
+\subsection{Notation}\label{sec:notation}
+
+We denote algorithms with typefont upper-case English letters like $\texttt{A}$, $\texttt{B}$, or $\texttt{O}$, or typefont names like $\texttt{Setup}$, $\texttt{KeyGen}$, and so on.  For any prime $p$, denote the field with $p$ elements as $\mathbb{F}_p := \mathbb{Z}/p\mathbb{Z}$, and denote the non-zero elements as $\mathbb{F}_p^*$.
+
+Group parameters are denoted as a tuple $(p, \mathbb{G}, d, G)$ where $\mathbb{G}$ is an elliptic curve group with prime order $p$, $d$ is a dimension, and $G$ is a generator of $\mathbb{G}$. We denote integers, bits, indices, and scalars in $\mathbb{F}_p$ with lower-case English letters $x, y, z, b, c, i, j, k$, etc.\ and we denote group elements with upper-case English letters, $G, X, W$, and so on. We use lower-case Greek letters like $\sigma$ to describe signatures and upper-case calligraphic Latin letters like $\mathfrak{T}$ when describing key images.
+
+For these group parameters, the secret key space is $\mathbb{F}_p^*$ and the public key space is $\mathbb{G}$. For any non-zero secret key $\textit{sk} \in \mathbb{F}_p^*$, the corresponding public key $\textit{pk}$ is computed from the generator $G$ through exponentiation in $\mathbb{G}$ as usual. However, we use notation for a module over the field $\mathbb{Z}_p$ to maintain consistency with related work like \cite{van2013cryptonote} and \cite{noether}.
+
+We denote column vectors in boldface, such as $(x_1, \ldots, x_d)^\top = \textbf{x}$, and matrices in underlined boldface, such as $((x_{1,1}, x_{1,2}, \ldots, x_{1,n}), \ldots, (x_{d,1}, \ldots, x_{d,n})) = (\textbf{x}_1, \textbf{x}_2, \ldots, \textbf{x}_n) = \underline{\textbf{x}}$ is a $d\times n$ matrix. We denote the Hadamard product of two vectors with $\circ$, so for any $\textbf{x} = (x_1, x_2, \ldots, x_d) = (x_i)_{i=1}^{d}$, and for any $\textbf{y} = (y_i)_{i=1}^{d}$, we denote the sequence $(x_i \cdot y_i)_{i=1}^{d}$ with $\textbf{x} \circ \textbf{y}$. We denote bitwise concatenation with the symbol $\mid \mid$.
+
+We distinguish oracles with calligraphic font; $\mathcal{CO}$ denotes a corruption oracle, $\mathcal{SO}$ denotes a signing oracle, and so on. If the codomain of a random oracle is the field of scalars $\mathbb{F}_p$, we denote this $\mathcal{H}^s$ (hash-to-scalar). If the codomain is $\mathbb{G}$, we denote this $\mathcal{H}^p$ (hash-to-point).
+
+
+\section{Linkable and $d$-linkable ring signatures}\label{sec:lrs}
+
+In this section, we recall linkable ring signature schemes, related definitions, and relevant examples.
+
+\begin{definition}[Linkable ring signature]\label{def:lrs}
+A \textit{linkable ring signature scheme} is a tuple $\left(\texttt{Setup}, \texttt{KeyGen}, \right. \allowbreak \left. \texttt{Sign}, \texttt{Verify}, \texttt{Link}\right)$ satisfying the following.
+\begin{itemize}
+\item $\texttt{Setup}(1^\lambda) \to \textit{par}$. $\texttt{Setup}$ takes as input a security parameter $1^\lambda$, produces some public parameters $\textit{par}$.
+
+\item $\texttt{KeyGen}(1^\lambda, \textit{par}) \to (sk, pk)$. $\texttt{KeyGen}$ takes as input a security parameter $1^\lambda$ and public parameters $\textit{par}$. $\texttt{KeyGen}$ produces as output a private-public keypair $(sk, pk)$.
+
+\item $\texttt{Sign}\left(1^\lambda, \textit{par}, (m, \textbf{pk}, sk)\right) \to \left\{\bot_{\texttt{Sign}}, \sigma \right\}$. $\texttt{Sign}$ takes as input a security parameter $1^\lambda$, public parameters $\textit{par}$, an arbitrary message $m \in \left\{0,1\right\}^*$, an ad hoc \textit{ring} of public keys $\textbf{pk} = \left\{pk_1, \ldots, pk_n\right\}$, and a secret key $sk$. $\texttt{Sign}$ produces as output either a distinguished failure symbol $\textit{out} = \bot_{\texttt{Sign}}$ or a signature $\sigma$.
+
+\item $\texttt{Verify}\left(1^\lambda, \textit{par}, (m, \textbf{pk}, \sigma)\right) \to \left\{0,1\right\}$. $\texttt{Verify}$ takes as input a security parameter $1^\lambda$, public parameters $\textit{par}$, a message $m$, a ring of public keys $\textbf{pk}$, and a signature $\sigma$. $\texttt{Verify}$ produces as output a bit $b \in \left\{0,1\right\}$; $0$ indicates the signature is not verified, and $1$ indicates the signature is verified.
+
+\item $\texttt{Link}\left(1^\lambda, \textit{par}, (m, \textbf{pk}, \sigma), (m^\prime, \textbf{pk}^\prime, \sigma^\prime)\right)$. $\texttt{Link}$ takes as input a security parameter $1^\lambda$, public parameters $\textit{par}$, and a pair of tuples $(m, \textbf{pk}, \sigma), (m^\prime, \textbf{pk}^\prime, \sigma^\prime)$ for messages $m, m^\prime$, rings $\textbf{pk}$, $\textbf{pk}^\prime$, and signatures $\sigma, \sigma^\prime$. $\texttt{Link}$ produces as output a bit $b \in \left\{0,1\right\}$; $0$ indicates the signatures are not linked or invalid, and $1$ indicates the signatures are valid and linked.\footnote{This is the opposite of the conventions in, say, \cite{tsang2004separable}, which outputs $0$ to indicate two signatures are linked (\textit{i.e.}\ rejected) and outputs $1$ to indicate two signatures are not linked (\textit{i.e.}\ accepted).}
+\end{itemize}
+\end{definition}
+
+In the sequel, we implicitly assume all algorithms in a LRS take the security parameters as input, and all algorithms (except $\texttt{Setup}$) take public parameters $\textit{par}$ as input. We suppress this notation in the sequel. For example, we write $\textit{par} \leftarrow \texttt{Setup}$ instead of $\textit{par} \leftarrow \texttt{Setup}(1^\lambda)$ and $\sigma \leftarrow \texttt{Sign}(m, \textbf{pk}, \textit{sk})$ instead of $\sigma \leftarrow \texttt{Sign}(1^\lambda, \textit{par}, m, \textbf{pk}, \textit{sk})$.
+
+Note that the vector dimension of keys in Definition \ref{def:lrs} is not specified. If the keys from $\texttt{KeyGen}$ have dimension $d$, we instead say the LRS is a $d$-LRS and use the vector notation introduced in Section \ref{sec:notation} representing keys in boldface (\textit{e.g.}\ \textbf{pk} instead of \textit{pk}) and rings in underlined boldface ($\underline{\textbf{pk}}$ instead of $\textbf{pk}$). We always assume the first coordinate of a key is the \textit{linking key}, and all other coordinates are \textit{auxiliary keys}; we will see that in practice, linkability depends only on the linking coordinate of the signing key vector. For applications in signer-ambiguous confidential transaction models, this is important since only one coordinate in a vector key corresponds to a public key used for double-spend detection purposes.
+
+
+\subsection{Examples}\label{sec:examples}
+
+In the following examples, all verifiers must list ring public keys in an agreed-upon order for verification to operate properly; in practice, it is simple to use lexicographical ordering.
+
+\begin{example}\label{ex:lsag}
+The signature scheme of \cite{liu} is an LRS (and, therefore, a $1$-LRS); we present the variant from \cite{van2013cryptonote} with a linking tag (a signature element which is used for identifying linked signatures) appropriate for linking signatures key-by-key. The signature scheme originally described in \cite{liu} signs a message $m$ with a ring of keys $\textbf{pk} = \left\{\textit{pk}_1, \ldots, \textit{pk}_n\right\}$ and a secret index-key pair $(\ell, \textit{sk})$ corresponding to some $\textit{pk}_\ell$, and the linking tag $\mathfrak{T} := \textit{sk} \cdot \mathcal{H}^p(\textbf{pk})$.
+
+Unfortunately, this tag construction is unsuitable for many applications, as changing ring members will change the linking tag, allowing the same key to sign twice. For use in applications where double-signing detection should be independent of non-signing ring members and following \cite{van2013cryptonote}, we modify the tag from that of \cite{liu} to be $\mathfrak{T} := \textit{sk} \cdot \mathcal{H}^p(\textit{pk}_\ell)$, which is independent of the non-signing ring members. This allows tags to be used for double-spend protection, as discussed below.
+
+$\texttt{Setup}$ always deterministically sets $d := 1$, so there are no auxiliary keys as part of key vectors. $\texttt{Setup}$ selects a generator $G \in \mathbb{G}$ to be a group generator for the group parameters $(p, \mathbb{G}, d, G)$, two cryptographic hash functions $\mathcal{H}^s:\left\{0,1\right\}^* \to \mathbb{F}_p$ and $\mathcal{H}^p:\left\{0,1\right\}^* \to \mathbb{G}$. $\texttt{Setup}$ outputs $\textit{par} = (p, \mathbb{G}, d, G, \mathcal{H}^s, \mathcal{H}^p)$.
+
+$\texttt{KeyGen}$ produces as output a secret key $\textit{sk} \in \mathbb{F}_p^*$ and the corresponding public key $\texttt{pk} = \textit{sk}\cdot G\in \mathbb{G}$.
+
+$\texttt{Sign}$ takes as input a private key $\textit{sk} \in \mathbb{F}_p^*$, a message $m$, a ring $\textbf{pk} = \left\{\textit{pk}_1, \ldots, \textit{pk}_n\right\}$, and produces as output either a distinguished failure symbol $\bot_{\texttt{Sign}}$ or a signature $\sigma$, computed as follows. First, the signer samples field elements $\alpha, s_{\ell+1}, s_{\ell+2}, \ldots, s_{\ell-1} \in \mathbb{F}_p$ at random. Next, the signer computes group elements $H_i = \mathcal{H}^p(\textit{pk}_i)$ and the linking tag $\mathfrak{T} = \textit{sk} \cdot \mathcal{H}^p(\textit{pk}_\ell)$, the first challenge $$c_{\ell+1}  = \mathcal{H}^s(\textbf{pk} \mid \mid m \mid \mid \alpha G \mid \mid \alpha H_\ell)$$ and each subsequent challenge $$c_{i+1} = \mathcal{H}^s(\textbf{pk} \mid \mid m \mid \mid s_i G + c_i \cdot \textit{pk}_i \mid \mid s_i H_i + c_i \mathfrak{T})$$ for $i = \ell+1, \ldots, \ell-1$, naturally identifying index $1$ with index $n+1$. The signer finishes by computing $s_\ell = \alpha - c_\ell \cdot \textit{sk}$ and publishing the signature $\sigma$ where $\sigma = (c_1, s_1, \ldots, s_n, \mathfrak{T})$.
+
+$\texttt{Verify}$ takes as input a message $m$, a ring $\textbf{pk}$, and a purported signature $\sigma^\prime$. $\texttt{Verify}$ parses $(c_1, s_1, \ldots, s_n, \mathfrak{T}) \leftarrow \sigma$. If $c_1 \notin \mathbb{F}_p$ or any $s_i \notin \mathbb{F}_p$ or $\mathfrak{T} \notin \mathbb{G}$, then $\texttt{Verify}$ outputs $0$. Otherwise, the verifier computes $H_i := \mathcal{H}^p(X_i)$ for each ring member, sets $c_1^\prime := c_1$, and computes the challenges $$c_{i+1}^\prime = \mathcal{H}^s(\textbf{pk} \mid \mid m \mid \mid s_i G + c_i^\prime \cdot \textit{pk}_i \mid \mid s_i H_i + c_i^\prime \mathfrak{T})$$ for $i=1, 2, \ldots, n$. The verifier outputs $1$ when $c_{n+1}^\prime = c_1$ and $0$ otherwise.
+
+$\texttt{Link}$ checks the validity of both signatures. If both are valid, $\texttt{Link}$ parses the linking tags $\mathfrak{T}$ and $\mathfrak{T}^\prime$. If either are not in $\mathbb{G}$, the linker outputs $0$ and terminates. Otherwise, the linker outputs $1$ when $\mathfrak{T} = \mathfrak{T}^\prime$ and $0$ otherwise.
+\end{example}
+
+
+\begin{example}\label{ex:mlsag}
+This example extends the LRS of the previous example to a so-called MLSAG scheme \cite{noether}, which is a $2$-LRS for use in signer-ambiguous confidential transactions.
+
+$\texttt{Setup}$ always deterministically sets $d := 2$, so there is one auxiliary key, but otherwise works as before.
+
+$\texttt{KeyGen}$ produces as output a secret key $\textbf{sk} = (x, z) \in \mathbb{F}_p^* \times \mathbb{F}_p^*$ and the corresponding public key  $\textbf{pk} := \textbf{sk} \circ \textbf{G} = (xG, zG) \in \mathbb{G}^2$ where $\textbf{G} = (G, G) \in \mathbb{G}^2$. The key $x$ is the linking key. The auxiliary key $z$ is a blinder that opens a Pedersen commitment to zero demonstrating transaction balance in ring confidential transactions in the style of \cite{noether}.
+
+$\texttt{Sign}$ takes as input a (non-zero) private key $\textbf{sk} \in \mathbb{F}_p^* \times \mathbb{F}_p^*$, a message $m$, a ring $\underline{\textbf{pk}} \in \mathbb{G}^{2 \times n}$, and produces as output either a distinguished failure symbol $\bot_{\texttt{Sign}}$ or a signature $\sigma$, computed as follows. First, the signer samples rows of signature data  $\alpha, \alpha^\prime, s_{\ell + 1}, s^\prime_{\ell + 1}, s_{\ell + 2}, s^\prime_{\ell + 2}, \ldots, s_{\ell -1}, s^\prime_{\ell - 1} \in \mathbb{F}_p$ at random. Next, the signer computes the group elements $H_i = \mathcal{H}^p(X_i)$ from the linking keys $X_i$ of each ring member $\textbf{pk}_i = (X_i, Z_i)$. The linking tag $\mathfrak{T} = x H_\ell$ is computed from the linking key. Another group element with the same base but discrete logarithm $z_\ell$ is computed: $\mathfrak{D} = z_\ell H_\ell$. The signer computes the challenges
+$$c_{\ell + 1} = \mathcal{H}^s(\textbf{pk} \mid \mid m \mid \mid \alpha G \mid \mid \alpha H_\ell \mid \mid \alpha^\prime G \mid \mid \alpha^\prime H_\ell)$$
+and
+$$c_{i+1} = \mathcal{H}^s(\textbf{pk} \mid \mid m \mid \mid s_i G + c_i X_i \mid \mid s_i H_i + c_i \mathfrak{T} \mid \mid s_i^\prime G + c_i Z_i \mid \mid s_i^\prime H_i + c_i \mathfrak{D}).$$
+The values $s_\ell = \alpha - c_\ell x_\ell$ and $s_\ell^\prime = \alpha^\prime - c_\ell z_\ell$ are computed. The signature is set $\sigma := (c_1, s_1, s_1^\prime, \ldots, s_n, s_n^\prime, \mathfrak{T}, \mathfrak{D})$ and is output.
+
+$\texttt{Verify}$ takes as input a message $m$, a ring $\underline{\textbf{pk}}$, and a signature $\sigma$. The verifier parses $(c_1, s_1, s_1^\prime, \ldots, s_n, s_n^\prime, \mathfrak{T}, \mathfrak{D}) \leftarrow \sigma$. If this is not possible, or $c_1 \notin \mathbb{F}_p$, or any $s_i$ or $s_i^\prime \notin \mathbb{F}_p$, or if $\mathfrak{T} \notin \mathbb{G}$, then the verifier outputs $0$. Otherwise, the verifier parses $(\textbf{pk}_1, \ldots, \textbf{pk}_{n^\prime}) \leftarrow \underline{\textbf{pk}}$. If any $\textbf{pk}_i \notin \mathbb{G}^2$, or if $n \neq n^\prime$, the verifier outputs $0$. Otherwise, the verifier parses each $\textbf{pk}_i$ as $(X_i, Z_i)$, computes each $H_i = \mathcal{H}^p(X_i)$, sets $c_1^\prime := c_1$, and computes the challenges $$c_{i+1}^\prime = \mathcal{H}^s(\textbf{pk} \mid \mid m \mid \mid s_i G + c_i^\prime X_i \mid \mid s_i H_i + c_i^\prime \mathfrak{T} \mid \mid s_i^\prime G + c_i^\prime Z_i \mid \mid s_i^\prime H_i + c_i^\prime \mathfrak{D})$$ for $i=1, 2, \ldots, n$. The verifier outputs $1$ when $c_{n+1}^\prime = c_1$ and $0$ otherwise.
+
+Lastly, $\texttt{Link}$ works as before, by comparing linking tags.
+\end{example}
+
+
+\section{Construction}\label{sec:construction}
+In this section, we describe $d$-CLSAG, our implementation of a concise $d$-LRS construction.
+
+\subsection{Implementation}\label{sec:implementation}
+\begin{definition}[$d$-CLSAG]\label{def:clsag}
+The tuple $(\texttt{Setup}, \texttt{KeyGen}, \texttt{Sign}, \texttt{Verify}, \allowbreak \texttt{Link})$ satisfying the following is a $d$-LRS signature scheme.
+
+\begin{itemize}
+\item $\texttt{Setup} \to \textit{par}$. $\texttt{Setup}$ selects a prime $p$, a group $\mathbb{G}$ with prime order $p$, selects a group generator $G \in \mathbb{G}$ uniformly at random, selects $d$ cryptographic hash functions $\mathcal{H}^s_0, \ldots, \mathcal{H}^s_{d-1}$ with codomain $\mathbb{F}_p$, selects a cryptographic hash function $\mathcal{H}^p$ with codomain $\mathbb{G}$. $\texttt{Setup}$ outputs the group parameter tuple and the hash functions, $\textit{par} := \left(p,\mathbb{G}, d, G, \left\{\mathcal{H}^s_j\right\}_{j=0}^{d-1}, \mathcal{H}^p\right)$.\footnote{Note that domain separation can be used here to take one $\mathcal{H}^s$ and construct each $\mathcal{H}^s_j$ by defining $\mathcal{H}^s_j(x) := \mathcal{H}^s(j \mid\mid x)$.}
+
+\item $\texttt{KeyGen} \to (\textbf{sk}, \textbf{pk})$. When queried for a new key, $\texttt{KeyGen}$ samples a fresh secret key and computes the associated public key:
+\begin{align*}
+\textbf{sk} =& (x, z_1, \ldots, z_{d-1}) \leftarrow (\mathbb{F}_p^*)^d\\
+\textbf{pk} :=& \textbf{sk} \circ \textbf{G} = (X, Z_1, \ldots, Z_{d-1}) \in \mathbb{G}^d
+\end{align*} where $\textbf{G} = (G, \ldots, G) \in \mathbb{G}^d$. $\texttt{KeyGen}$ outputs $(\textbf{sk}, \textbf{pk})$. We say $x$ is the \textit{linking key} and the remaining keys $\left\{z_j\right\}$ are the \textit{auxiliary keys}.
+
+\item $\texttt{Sign}\left(m, \underline{\textbf{pk}}, \textbf{sk}\right) \to \left\{\bot_{\texttt{Sign}}, \sigma\right\}$. $\texttt{Sign}$ takes as input a message $m \in \left\{0,1\right\}^*$, a ring  $\underline{\textbf{pk}} = (\textbf{pk}_1, \ldots, \textbf{pk}_n)$ for ring members $\textbf{pk}_i = (X_i, Z_{i,1}, \ldots, Z_{i,d-1}) \in \mathbb{G}^d$, and a secret key $\textbf{sk} = (x,z_1, \ldots, z_{d-1}) \in (\mathbb{F}_p^*)^d$. $\texttt{Sign}$ does the following.
+
+\begin{enumerate}
+\item If $\underline{\textbf{pk}} \notin \mathbb{G}^{d\times n}$ for some $n$, $\texttt{Sign}$ outputs $\bot_{\texttt{Sign}}$ and terminates.
+
+\item Otherwise, $\texttt{Sign}$ parses\footnote{Note that this parsing always succeeds if $\texttt{Sign}$ does not fail in the previous step.} $\underline{\textbf{pk}}$ to obtain each $\textbf{pk}_i$. If the public key associated with the input $\textbf{sk}$ is not a ring member in $\underline{\textbf{pk}}$, then $\texttt{Sign}$ outputs $\bot_{\texttt{Sign}}$ and terminate.
+
+\item Otherwise, $\texttt{Sign}$ finds the signing index $\ell$ such that $\textbf{pk}_\ell = \textbf{sk} \circ (G, \ldots, G)$. $\texttt{Sign}$ samples $\alpha \in \mathbb{F}_p$, samples $\left\{s_i\right\}_{i \neq \ell} \in (\mathbb{F}_p)^{n-1}$, and computes the points $H_i = \mathcal{H}^p(X_i)$ for each $i$. $\texttt{Sign}$ computes the \textit{aggregation coefficients} $\mu_X$ and $\{\mu_j\}_{j=1}^{d-1}$, the linking tag $\mathfrak{T}$, the auxiliary group elements $\{\mathfrak{D}_j\}_{j=1}^{d-1}$, and the aggregated public keys:
+\begin{align*}
+\mathfrak{T} :=& x H_\ell & \{\mathfrak{D}_j\} :=&  \{z_j H_\ell\} \\
+\mu_X :=& \mathcal{H}^s_0(\underline{\textbf{pk}} \mid \mid \mathfrak{T} \mid \mid \{\mathfrak{D}_j\}_{j=1}^{d-1})
+ & \mu_j :=& \mathcal{H}^s_j(\underline{\textbf{pk}} \mid \mid \mathfrak{T} \mid \mid \{\mathfrak{D}_j\}_{j=1}^{d-1}) \\
+ W_i :=& \mu_X X_i + \sum_{j=1}^{d-1} \mu_j Z_{i,j} & \mathfrak{W} :=& \mu_X \mathfrak{T} + \sum_{j=1}^{d-1} \mu_j \mathfrak{D}_j
+ \end{align*} and the aggregated secret key $w_\ell :=  \mu_X x + \sum_{j=1}^{d-1} \mu_j z_j$. For $i = \ell, \ell+1, \ldots, \ell-1$, (and by identifying index $n+1$ with index $1$), $\texttt{Sign}$ computes
+\begin{align*}
+L_\ell =& \alpha G & R_\ell =& \alpha H_\ell & c_{\ell+1} =& \mathcal{H}^s_0(\underline{\textbf{pk}} \mid \mid m \mid \mid L_\ell \mid \mid R_\ell) \\
+L_i =& s_i G + c_i W_i & R_i =& s_i H_i + c_i \mathfrak{W}
+ & c_{i+1} =& \mathcal{H}^s_0(\underline{\textbf{pk}} \mid \mid m \mid \mid L_i \mid \mid R_i)
+\end{align*} and lastly computes $s_\ell = \alpha - c_\ell w_\ell$.
+
+\item $\texttt{Sign}$ sets the signature $\sigma = (c_1, s_1, \ldots, s_n, \mathfrak{T}, \{\mathfrak{D}_j\}_{j=1}^{d-1})$ and publishes the signature $\sigma$.
+\end{enumerate}
+
+\item $\texttt{Verify}\left(m, \underline{\textbf{pk}}, \sigma\right) \to \left\{0,1\right\}$. $\texttt{Verify}$ takes as input a message $m$, a matrix $\underline{\textbf{pk}} = (\textbf{pk}_1, \ldots, \textbf{pk}_n)$, and a signature $\sigma$.
+\begin{enumerate}
+\item If $\underline{\textbf{pk}} \notin \mathbb{G}^{d \times n}$ for some $n$, or if $\sigma \notin \mathbb{F}_p^{n^\prime+1} \times \mathbb{G}^d$ for some $n^\prime$, $\texttt{Verify}$ outputs $0$ and terminates. Otherwise, if $n^\prime \neq n$, $\texttt{Verify}$ outputs $0$ and terminates.
+
+\item $\texttt{Verify}$ parses\footnote{This parsing is always successful if the previous step does not terminate $\texttt{Verify}$.} $(\textbf{pk}_1, \ldots, \textbf{pk}_n) \leftarrow \underline{\textbf{pk}}$ for keys $\textbf{pk}_i \in \mathbb{G}^d$ for $i=1, \ldots, n$, and parses each public key $(X_i, Z_{i, 1}, \ldots, Z_{i, d-1}) \leftarrow \textbf{pk}_i$.  $\texttt{Verify}$ also parses $(c_1, s_1, \ldots, s_n, \mathfrak{T}, \mathfrak{D}_1, \ldots, \mathfrak{D}_{d - 1}) \leftarrow \sigma$. $\texttt{Verify}$ computes each $H_i = \mathcal{H}^p(X_i)$, computes the aggregation coefficients, and computes aggregated public keys:
+\begin{align*}
+\mu_X := & \mathcal{H}^s_0(\underline{\textbf{pk}} \mid \mid \mathfrak{T} \mid \mid \{\mathfrak{D}_j\}_{j=1}^{d-1}) & \mu_j := & \mathcal{H}^s_j(\underline{\textbf{pk}} \mid \mid \mathfrak{T} \mid \mid \{\mathfrak{D}_j\}_{j=1}^{d-1})\\
+W_i :=& \mu_X X_i + \sum_{j=1}^{d-1} \mu_j Z_{i,j} & \mathfrak{W} :=& \mu_X \mathfrak{T} + \sum_{j=1}^{d-1} \mu_j \mathfrak{D}_j
+\end{align*}
+
+\item $\texttt{Verify}$ sets $c_1^\prime := c_1$ and, for $i=1, 2, \ldots, n-1$, computes the following.
+\begin{align*}
+L_i :=& s_i G + c_i^\prime W_i, &
+R_i :=& s_i H_i + c_i^\prime\mathfrak{W}, &
+c_{i+1}^\prime :=& \mathcal{H}^s_0\left(\underline{\textbf{pk}} \mid \mid m \mid \mid L_i \mid \mid R_i\right)
+\end{align*}
+\item If $c_{n+1}^\prime = c_1$, $\texttt{Verify}$ outputs $1$, and otherwise outputs $0$.
+\end{enumerate}
+
+\item $\texttt{Link}\left((m, \underline{\textbf{pk}}, \sigma), (m^\prime, \underline{\textbf{pk}}^\prime, \sigma^\prime)\right) \to \left\{0,1\right\}$. $\texttt{Link}$ takes as input two message-ring-signature triples.
+\begin{enumerate}
+\item If $\texttt{Verify}(m, \underline{\textbf{pk}}, \sigma) = 0$ or $\texttt{Verify}(m^\prime, \underline{\textbf{pk}}^\prime, \sigma^\prime) = 0$, $\texttt{Link}$ outputs $0$ and terminates.
+
+\item Otherwise, $\texttt{Link}$ parses\footnote{As before with $\texttt{Verify}$, this parsing is always successful if the previous step does not terminate $\texttt{Link}$.} the signatures to obtain
+\begin{align*}
+(c_1, s_1, \ldots, s_n, \mathfrak{T}, \mathfrak{D}_1, \ldots, \mathfrak{D}_{d-1}) \leftarrow&  \sigma\text{ and}\\
+(c_1^\prime, s_1^\prime, \ldots, s_n^\prime, \mathfrak{T}^\prime, \mathfrak{D}_1^\prime, \ldots, \mathfrak{D}_{d-1}^\prime) \leftarrow& \sigma^\prime.
+\end{align*} $\texttt{Link}$ outputs $1$ if $\mathfrak{T} = \mathfrak{T}^\prime$ and $0$ otherwise.
+\end{enumerate}
+\end{itemize}
+\end{definition}
+
+
+\subsection{Efficiency}\label{sec:efficiency}
+Consider the space and time efficiency of Definition \ref{def:clsag}. We disregard any additional information typically broadcast alongside the signature, such as representations of the ring members.
+
+A $d$-CLSAG signature with a ring size of $n$ contains $n+1$ field elements and $d$ group elements; signature size is $k_s(n+1) + k_p d$ where $k_s$ describes the size of field elements and $k_p$ describes the size of group elements.
+
+To examine the verification time complexity, instead let $k_s$ and $k_p$ be the time complexity of evaluating the hash-to-scalar functions $\mathcal{H}^s$ and of evaluating the hash-to-point function $\mathcal{H}^p$, respectively. Let $k^{(i)}$ be the time complexity to evaluate a linear combination of $i$ terms; using specialized algorithms like Straus \cite{straus} or Pippenger \cite{pippenger} multiscalar multiplication (or others, based on $i$), such a linear combination can be evaluated much more quickly than a simple term-by-term computation. We note that it is also possible to cache multiples of group elements that are reused within verification for faster linear combination evaluation, but we do not differentiate this here. Using these, the time complexity of $d$-CLSAG verification is $(n+d)k_s + nk_p + 2nk^{(d+1)}$.
+
+To compare to the efficiency of an MLSAG implementation from \cite{noether}, observe that $2$-CLSAG has equivalent functionality to an MLSAG signature (which is a $2$-LRS). An MLSAG signature used in this way produces $2n+1$ field elements and $1$ group element.
+
+We produced a test implementation in C++ and tested signing and verification for MLSAG and $2$-CLSAG on a 2.1 GHz Opteron processor. Table \ref{table:timing} shows the results for different ring sizes. In particular, we note that for smaller anonymity sizes, $2$-CLSAG is uniformly faster than MLSAG. However, at very large ring sizes, MLSAG is faster due to additional computations involved in computing aggregation coefficients and key prefixing. Despite this eventual inefficiency, we note that the linear space requirements generally preclude the use of very large ring sizes in practice, making $2$-CLSAG an efficient improvement over MLSAG in both space and time.
+
+\begin{table}[htp]
+\begin{center}
+\begin{tabular}{r|ll|ll}
+& \multicolumn{2}{c|}{Verify} & \multicolumn{2}{c}{Sign} \\
+\hline
+Anonymity set & MLSAG & CLSAG & MLSAG & CLSAG \\
+\hline
+2 & 2.4 & 2.0 & 2.3 & 2.7 \\
+4 & 4.7 & 4.0 & 4.6 & 4.6 \\
+8 & 9.5 & 7.8 & 9.4 & 8.5 \\
+16 & 18.9 & 15.9 & 18.9 & 16.5 \\
+32 & 37.8 & 32.3 & 37.8 & 33.0 \\
+64 & 75.4 & 67.5 & 75.9 & 68.3 \\
+128 & 150 & 147 & 151 & 148 \\
+256 & 301 & 344 & 303 & 346
+\end{tabular}
+\end{center}
+\caption{Signing and verification times (ms) for MLSAG and $2$-CLSAG}
+\label{table:timing}
+\end{table}
+
+
+\section{Security model}\label{sec:security}
+We now introduce the hardness assumptions and security definitions that apply to a $d$-LRS construction (and, implicitly, to an LRS construction). In particular, we rely on the $k$-one more discrete logarithm ($k$-OMDL) and decisional Diffie-Hellman (DDH) hardness assumptions for our definitions.
+
+
+\subsection{Hardness assumptions and useful results}\label{sec:assumptions}
+\begin{definition}[k-OMDL assumption]\label{def:komdl}
+Let $k \in \mathbb{N}$. We say a PPT algorithm $\texttt{A}$ is a $(t, \epsilon)$-solver of the $k$-OMDL problem if, within time at most $t$ and with probability at least $\epsilon$, $\texttt{A}$ can succeed at the following.
+
+\begin{enumerate}
+\item The challenger uses group parameters $(p, \mathbb{G}, G)$ and picks a collection of group elements $G_1, G_2, \ldots, G_{k}, G_{k+1} \in \mathbb{G}$ (the targets) uniformly at random from $\mathbb{G}$. The challenger sends the group parameters and $\left\{G_i\right\}$ to $\texttt{A}$.
+
+\item $\texttt{A}$ is granted access to a corruption oracle $\mathcal{CO}$ that takes as input some $G_i$ sent to $\texttt{A}$ and produces as output the discrete logarithm of $G_i$ with respect to $G$, \textit{i.e.}\ some $x_i \in \mathbb{F}_p^*$ such that $G_i = x_i G$.
+
+\item $\texttt{A}$ produces as output a sequence of $k+1$ scalars $x_1, \ldots, x_{k+1} \in \mathbb{F}_p^*$, counting as a success if:
+\begin{enumerate}[(i)]
+\item for each $x_i$, there exists some index $1 \leq j(i) \leq k+1$ such that $G_{j(i)} = x_iG$ and
+\item $\texttt{A}$ made no more than $k$ queries to $\mathcal{CO}$.
+\end{enumerate}
+\end{enumerate}
+\end{definition}
+
+\begin{definition}[Decisional Diffie-Hellman]\label{ddhgame} Let $\texttt{A}$ be any PPT algorithm, and $(p, \mathbb{G}, G)$ some group parameters. We say $\texttt{A}$ is a $(t, \epsilon, \kappa)$-solver of the Decisional Diffie-Hellman game if $\texttt{A}$ can succeed in time at most $t$ with probability at least $\epsilon$ in the following game.
+\begin{enumerate}
+\item The challenger selects $(r_{i,1}, r_{i,2}, r_{i,3}) \in \left(\mathbb{F}_p\right)^3$ uniformly and independently for $i=0, 1, ..., \kappa-1$. The challenger computes the public keys $R_{i,1} = r_{i,1} G$, $R_{i,2} = r_{i,2}G$, $R_{i,3}^{(0)} = r_{i,1} r_{i,2} G$, $R_{i,3}^{(1)} = r_{i,3} G$.
+
+\item The challenger selects a bit $b$ independently and uniformly from $\left\{0,1\right\}$ and sends the triples $\left\{(R_{i,1}, R_{i,2}, R_{i,3}^{(b)})\right\}_{i=0}^{\kappa - 1}$ to $\texttt{A}$.
+
+\item $\texttt{A}$ outputs a bit $b^\prime$, succeeding if $b = b^\prime$.
+\end{enumerate}
+\end{definition}
+
+To later prove that the existence of a forger implies that of a $k$-OMDL solver, we will use the forking lemma. In the following, we presume the bit length $\eta$ is used to describe group elements in $\mathbb{G}$ and scalars in $\mathbb{F}_p$, \textit{i.e.}\ $\eta = O(\left|p\right|)$.
+
+\begin{lemma}[General forking lemma]\label{lem:fork}
+Let $q, \eta \geq 1$. Let $\texttt{A}$ be any PPT algorithm which takes as input some $x_\texttt{A} = (x, \textbf{h})$ where $\textbf{h} = (h_1, \ldots, h_q)$ is a sequence of oracle query responses ($\eta$-bit strings) and returns as output $y_{\texttt{A}}$ either a distinguished failure symbol $\bot$ or a pair $(\textit{idx}, y)$ where $\text{idx} \in [q]^2$ and $y$ is some output. Let $\epsilon_{\texttt{A}}$ denote the probability that $\texttt{A}$ does not output $\bot_{\texttt{A}}$ (where this probability is taken over all random coins of $\texttt{A}$, the distribution of $x$, all choices $\textbf{h}$). Let $\mathcal{F} = \mathcal{F}^{\texttt{A}}$ be a forking algorithm for $\texttt{A}$. The accepting probability of $\mathcal{F}$ satisfies \[\epsilon_{\mathcal{F}} \geq \epsilon_{\texttt{A}} \left(\frac{\epsilon_{\texttt{A}}}{q} - \frac{1}{2^\eta}\right).\]
+\end{lemma}
+
+
+\subsection{Security definition}\label{sec:definitions}
+Correctness requires that an honest verifier will always verify an honest signature.
+
+\begin{definition}[Correctness]\label{def:correctness}
+Let $m$ be any message, and $\texttt{KeyGen} \rightarrow (\textbf{sk},\textbf{pk})$ be any key pair. Let $\underline{\textbf{pk}^\prime}$ be an arbitrary set of group elements in $\mathbb{G}$ containing $\textbf{pk}$.
+
+We say that a $d$-LRS construction is (perfectly) \textit{correct} if it always holds that $$\texttt{Verify}(m,\underline{\textbf{pk}^\prime},\texttt{Sign}(m,\underline{\textbf{pk}^\prime},\textbf{sk})) = 1.$$
+\end{definition}
+Note that we do not assume that all keys in the ring member set were generated from $\texttt{KeyGen}$; in practice, an honest signer may choose non-signing ring members that were generated maliciously by an adversary. In general, correctness is proved easily by inspection.
+
+Our definition of unforgeability captures the idea that an adversary can persuade honest users to turn over their secret keys (which we model by a corruption oracle) or to sign arbitrary messages with arbitrary rings (modeled by a signing oracle). We use a modified version of the definition of existential forgery with insider corruption for a ring signature by Bender, Katz, and Morselli \cite{bender}. In contrast with the definition in \cite{bender}, our modification allows for a forger to succeed at the forgery game with partially corrupted rings.
+
+\begin{definition}[Existential unforgeability with respect to insider corruption]\label{def:unforgeability}
+Let $n(-)$ be a positive polynomial. Let $\mathcal{H}^s:\left\{0,1\right\}^* \to \mathbb{F}_p$ be modeled as a random oracle. Let $\mathcal{CO}$ be a corruption oracle that takes as input a public key $\textbf{pk}$ from the list of challenge keys and produces as output the corresponding secret key $\textbf{sk}$. Let $\mathcal{SO}$ be a signing oracle that takes as input some $(m, \underline{\textbf{pk}}^\prime, \ell)$ such that $\underline{\textbf{pk}^\prime}$ is a matrix of challenge key vectors (\textit{i.e.}\ each column is in $\textbf{pk}$) and produces as output a signature $\sigma$ such that $\texttt{Verify}(m, \underline{\textbf{pk}}^\prime, \sigma) = 1$ and such that the linking tag $\mathfrak{T} \in \sigma$ is the tag corresponding to the $\ell^{th}$ key in $\underline{\textbf{pk}}^\prime$.
+
+We say a PPT algorithm $\texttt{A}$  is a $(t, \epsilon, q_h, q_c, q_s,  \kappa(-))$-forger of a $d$-LRS construction if, within time at most $t$ and with at most $q_h$ oracle queries to $\mathcal{H}^s$, at most $q_c$ oracle queries to $\mathcal{CO}$, and at most $q_s$ queries to $\mathcal{SO}$, $\texttt{A}$ can succeed at the following game with probability at least $\epsilon$.
+\begin{enumerate}
+\item Challenge keys $\left\{(\textbf{sk}_i, \textbf{pk}_i)\right\}_{i=1}^{\kappa(\lambda)} \leftarrow \texttt{KeyGen}(1^\lambda)$ are selected and the public keys $\underline{\textbf{pk}} = \left\{\textbf{pk}_i\right\}_{i=1}^{n(\lambda)}$ are sent to $\texttt{A}$.
+
+\item $\texttt{A}$ is granted access to a corruption oracle $\mathcal{CO}$, random oracle $\mathcal{H}^s$, and the signing oracle $\mathcal{SO}$.
+
+\item $\texttt{A}$ outputs a message $m$, a ring of at most $n$ public keys $\underline{\textbf{pk}}^\prime$, and a signature $\sigma$. This output is a success if
+\begin{enumerate}
+\item $\sigma$ is not output from any query made to $\mathcal{SO}$; and
+
+\item the linking tag $\mathfrak{T} \in \sigma$ does not correspond to a corrupted ring member; and
+
+\item $\texttt{Verify}(m, \underline{\textbf{pk}}^\prime, \sigma) = 1$.
+\end{enumerate}
+\end{enumerate}
+\end{definition}
+
+\begin{remark}
+Note that if the corruption oracle merely acted by computing arbitrary discrete logarithms, then an adversary could do the following: take some target $\textbf{pk}$ from the challenge set, apply a permutation to the coordinates of $\textbf{pk}$, pass the permuted key through $\mathcal{CO}$, obtain the discrete logarithm of the first (signing) key of $\textbf{pk}$, compute the key image for this signing key, and lastly produce a signature using $\texttt{Sign}$. For example, to find the discrete logarithm of the linking key in $\textbf{pk} = (A, B)$, the adversary may query $\mathcal{CO}$ with $(B, A)$, bypassing our definition.
+
+Such a signature would pass validation and not be described as a forgery according to our definition. Our definition avoids this problem by requiring the corruption oracle only be queried with challenge keys. This has the added benefit that it is possible to simulate the corruption oracle for a black-box execution of $\texttt{A}$.
+\end{remark}
+
+Linkability requires that an adversary cannot generate $q + 1$ non-linking signatures using only a combined $q$ possible public keys, asserting that a linking collision must exist, as in \cite{backes2019ring}.
+
+\begin{definition}[Linkability]
+We say a PPT algorithm $\texttt{A}$  is a $(t, \epsilon, q_c, \kappa(-))$-solver of the linkability game if, within time at most $t$ and with at most $q_c$ oracle queries to $\mathcal{CO}$, $\texttt{A}$ can succeed at the following game with probability at least $\epsilon$ for any $q \geq 1$.
+\begin{enumerate}
+\item Challenge keys $\left\{(\textbf{sk}_i, \textbf{pk}_i)\right\}_{i=1}^{\kappa(\lambda)} \leftarrow \texttt{KeyGen}(1^\lambda)$ are selected and the public keys $\underline{\textbf{pk}} = \left\{\textbf{pk}_i\right\}_{i=1}^{n(\lambda)}$ are sent to $\texttt{A}$.
+
+\item $\texttt{A}$ is granted access to a corruption oracle $\mathcal{CO}$.
+
+\item $\texttt{A}$ outputs tuples $\{(m_i, \underline{\textbf{pk}}_i^\prime, \sigma_i)\}_{i=1}^{q+1}$. We say $\texttt{A}$ wins if
+\begin{enumerate}
+\item for all $i$ we have $\underline{\textbf{pk}}_i^\prime \subset \underline{\textbf{pk}}$;
+\item $\left| \bigcup_{i=1}^{q+1} \underline{\textbf{pk}}_i^\prime \right| = q$;
+\item for all $i$ we have $\texttt{Verify}(m_i, \underline{\textbf{pk}}_i^\prime, \sigma_i) = 1$; and
+\item for all $i \neq j$ we have $\texttt{Link}(\sigma_i,\sigma_j) = 0$.
+\end{enumerate}
+
+\end{enumerate}
+\end{definition}
+
+Non-frameability asserts that an adversary cannot generate a signature linking to another without knowledge of a common signing private key.
+
+\begin{definition}[Non-frameability]
+We say that a given PPT algorithm $\texttt{A}$ is a $(t, \epsilon, q_c, q_s, \kappa(-))$-solver of the frameability game if, within time at most $t$, with at most $q_c$ oracle queries to $\mathcal{CO}$, and with at most $q_s$ oracle queries to $\mathcal{SO}$, $\texttt{A}$ can succeed at the following game with probability at least $\epsilon$.
+\begin{enumerate}
+\item Challenge keys $\left\{(\textbf{sk}_i, \textbf{pk}_i)\right\}_{i=1}^{\kappa(\lambda)} \leftarrow \texttt{KeyGen}(1^\lambda)$ are selected and the public keys $\underline{\textbf{pk}} = \left\{\textbf{pk}_i\right\}_{i=1}^{n(\lambda)}$ are sent to $\texttt{A}$.
+
+\item $\texttt{A}$ is granted access to a corruption oracle $\mathcal{CO}$ and a signing oracle $\mathcal{SO}$.
+
+\item $\texttt{A}$ chooses a challenger key $\textbf{pk}$ that was not queried to $\mathcal{CO}$, an arbitrary message $m$, a ring of public keys $\underline{\textbf{pk}}^* \subset \underline{\textbf{pk}}$ containing $\textbf{pk}$, and queries $\mathcal{SO}(\textbf{pk},m,\underline{\textbf{pk}}^*) \to \sigma$.
+
+\item $\texttt{A}$ outputs a tuple $(m^\prime, \underline{\textbf{pk}}^\prime, \sigma^\prime)$ such that $\underline{\textbf{pk}}^\prime \subset \underline{\textbf{pk}}$ and $\sigma^\prime$ was not the output of any query to $\mathcal{SO}$. We say $\texttt{A}$ wins if
+\begin{enumerate}
+\item $\texttt{Verify}(m^\prime, \underline{\textbf{pk}}^\prime, \sigma^\prime) = 1$; and
+\item $\texttt{Link}(\sigma,\sigma^\prime) = 1$.
+\end{enumerate}
+\end{enumerate}
+\end{definition}
+
+We use a modification of the definition of linkable anonymity from \cite{backes2019ring}. Note that our definition is strictly weaker; while the solver can provide malicious keys in rings, it is not granted access to a corruption oracle. However, we implicitly model the case where the adversary is able to obtain the key image corresponding to an honest user's public key: the adversary simply requests a signature on such a key (using any ring and message compatible with the signing oracle definition), and discards all output data except the key image. This could also be modeled as a separate oracle, but with identical results and equivalent security.
+
+\begin{definition}[Linkable anonymity]\label{linkable-anonymity-game} Let $\texttt{A}$ be any PPT algorithm. We say $\texttt{A}$ is a $(t, \epsilon, \kappa)$-solver of the linkable anonymity game if it can succeed in time at most $t$ with probability at least $\epsilon$ in the following game:
+
+\begin{enumerate}
+\item (Setup phase): The challenger selects secret keys $\underline{\textbf{sk}}^* = \left\{\textbf{sk}_i^*\right\}_{i=1}^{\kappa(\lambda)} \subseteq (\mathbb{F}_p^*)^d$, computes the corresponding public keys $\underline{\textbf{pk}}^* = \left\{\textbf{pk}_i^* \mid \textbf{pk}_i^* = \textbf{sk}_i^* \circ \textbf{G}\right\}_i$, selects a bit at random $\overline{b} \in \left\{0, 1\right\}$, and sends $\underline{\textbf{pk}}^*$ to $\texttt{A}$.
+
+\item (Key phase): $\texttt{A}$ outputs a pair of indices $i_0, i_1$ such that $\textbf{pk}_{i_0}^*, \textbf{pk}_{i_1}^* \in \underline{\textbf{pk}}^*$. The challenger interprets $\textbf{pk}_{i_0}^*, \textbf{pk}_{i_1}^*$ as the target keys.
+
+\item (Signing phase):  $\texttt{A}$ is granted access to a signing oracle $\mathcal{SO}$. The signing oracle $\mathcal{SO}$ takes as input a message $m \in \left\{0, 1\right\}^*$, ring $\underline{\textbf{pk}}$, and a public key $\textbf{pk} \in \underline{\textbf{pk}}$. The oracle $\mathcal{SO}$ then does the following.
+\begin{itemize}
+\item If $\left\{\textbf{pk}_{i_0}^*, \textbf{pk}_{i_1}^*\right\} \not\subseteq \underline{\textbf{pk}}$ or $\textbf{pk} \notin \underline{\textbf{pk}}$*, $\mathcal{SO}$ produces as output the distinguished failure symbol $\bot$.
+
+\item Otherwise, if $\textbf{pk} \notin \left\{\textbf{pk}_{i_0}^*, \textbf{pk}_{i_1}^*\right\}$, then $\mathcal{SO}$ retrieves $\textbf{sk} \in \underline{\textbf{sk}}^*$ such that $\textbf{pk} = \textbf{sk}  \circ \textbf{G}$, and outputs $\sigma \leftarrow \texttt{Sign}(m, \underline{\textbf{pk}}, \textbf{sk})$.
+
+\item Otherwise, $\textbf{pk} = \textbf{pk}_{i_c}^*$ for a bit $c$. The bit $c^\prime = (1-c)\overline{b} + c(1-\overline{b})$ is computed and the oracle outputs $\sigma \leftarrow \texttt{Sign}(m, \underline{\textbf{pk}}, \textbf{sk}_{i_{c^\prime}}^*)$.
+\end{itemize}
+
+\item (Decision phase): $\texttt{A}$ outputs a bit $\overline{b}^\prime$, succeeding if $\overline{b}^\prime = \overline{b}$.
+\end{enumerate}
+\end{definition}
+
+
+\subsection{Security results}\label{def:results}
+Here we present security results for the $d$-CLSAG construction in Definition \ref{def:clsag}. Proofs are included in Appendix \ref{app:proofs}.
+
+\begin{theorem}[Correctness]
+The $d$-CLSAG construction is perfectly correct.
+\end{theorem}
+This result follows by inspection, so we do not present a proof here.
+
+To show that $d$-CLSAG is unforgeable with respect to Definition \ref{def:unforgeability}, we prove that a solver of the unforgeability game is also a solver of the $k$-OMDL game.
+\begin{theorem}[Unforgeability]\label{thm:unforgeability}
+Let $d, q_h, q_c, q_s \in \mathbb{N}$  and let $(p,\mathbb{G},G)$ be some group parameters. If a $(t, \epsilon, q_h, q_c, q_s, \kappa(-))$-forger of the $d$-CLSAG construction exists, then a $(2t, \epsilon^\prime)$-solver of the $k$-OMDL problem in $\mathbb{G}$ exists for $k = d\cdot q_c + d - 1$, where $\epsilon^\prime \geq \epsilon\left(\frac{\epsilon}{q_c} - \frac{1}{2^\eta}\right) - p^{-1}$.
+\end{theorem}
+
+To show that the construction is linkable, we prove that a solver of the linkability game is also a solver of the unforgeability game.
+\begin{theorem}[Linkability]\label{thm:linkability}
+If a $(t, \epsilon, q_c, \kappa(-))$-solver of the linkability game exists for the $d$-CLSAG implementation, then a $(t, \epsilon, 0, q_c, 0, \kappa(-))$-forger exists.
+\end{theorem}
+
+Non-frameability will follow similarly.
+\begin{theorem}[Non-frameability]\label{thm:frameability}
+If there exists a $(t, \epsilon, q_c, q_s, \kappa(-))$-solver of the non-frameability for the $d$-CLSAG construction, then a $(t, \epsilon, 0, q_c, q_s, \kappa(-))$-forger exists.
+\end{theorem}
+
+To show that the construction has linkable anonymity, we prove that a solver of the linkable anonymity game is a solver of the DDH game.
+\begin{theorem}[Linkable anonymity]\label{thm:anonymity}
+If there exists a $(t, \epsilon, \kappa)$-solver of the linkable anonymity game, then a $(t^\prime, \epsilon^\prime, \kappa^\prime)$-solver of the DDH game exists.
+\end{theorem}
+
+
+\section{Applications}\label{sec:applications}
+
+\subsection{Single-asset ring confidential transactions}\label{sec:ringct}
+It is possible to use $2$-CLSAG as a replacement for MLSAG signatures in signer-ambiguous confidential transaction models for equivalent functionality. For example, the Monero protocol currently uses MLSAG signatures for two different transaction types: full and simple.
+
+Full transactions are only used when spending a single input. They leverage the fact that in a balanced transaction, the difference between input and output commitments is a commitment to zero; the signer can therefore use such differences as the second component of key vectors in the signature and sign using the known secret key at the signing index.
+
+Simple transactions are used when spending multiple inputs. Each spent input requires a separate signature, as a naive extension of full transactions presents an index linking issue. The signer first generates auxiliary commitments for each spent input using the same value but a different blinder. This means it is possible to use the difference between input and auxiliary commitments as a commitment to zero for the purpose of signing. By choosing all blinders at random except one, the signer can construct the auxiliary commitments such that the difference between auxiliary and output commitments is zero, proving balance.
+
+Both transaction types can be constructed with $2$-CLSAG signatures since linkability is not considered for the second key component used in the transaction protocols.
+
+
+\subsection{Multi-asset ring confidential transactions}\label{sec:marct}
+
+It is possible to use a straightforward $d$-CLSAG construction to accommodate transactions spending $d-1$ \textit{types} or \textit{colors} of assets separately within the same transaction and signature. To do so, transaction outputs are extended to have a separate commitment to each asset type value. When spending an output, either a full or simple transaction (discussed above) is used; we simply copy the method used to compute commitment public keys in the signature to additional dimensions of the $d$-CLSAG signature, using only the commitments for a particular asset type in each. This separation ensures that the transaction balances in each asset type separately, while taking advantage of the scaling benefits of $d$-CLSAG compared to the equivalent MLSAG signature construction.
+
+
+\subsection{Unmixable colors}\label{sec:unmixable}
+We informally describe an example of such a transaction model using two unmixable colors using $3$-CLSAG. Let $(\texttt{Prove}, \texttt{Ver})$ be a zero-knowledge sound range proving scheme, such as that described in \cite{bulletproofs}, and let $(\texttt{Com}, \texttt{Open})$ be a Pedersen commitment scheme such that $\texttt{Com}(r,v) = rG + v G^\prime$.
+
+For the sake of this example, we define a public trading key to be a tuple $(X, C, D, P)$ where $X, C, D \in \mathbb{G}$, $C$ and $D$ are amount commitments and $P$ is a batched range proof from $\texttt{Prove}$ covering the values of both $C$ and $D$. Here, $C$ and $D$ play the role of the $Z_j$ points, and $P$ is additional data required for the transaction protocol.
+
+We define a transaction key to be a tuple $(m, \textbf{Q}, \textbf{O}, (f_C, f_D), \sigma, \textit{aux})$ where $\textbf{Q}$ is a ring of $n$ public trading keys  $\textbf{Q} = \left\{(X_i, C_i, D_i, P_i)\right\}_{i=1}^{n}$, $\textbf{O}$ is a set of $n^\prime$ output public trading keys $\textbf{O} = \left\{(X_i^\prime, C_i^\prime, D_i^\prime, P_i^\prime)\right\}_{i=1}^{n^\prime}$, $f_C$ is a plaintext list of fees to be paid from $C$, $f_D$ is a plaintext list of fees to be paid from $D$, and $\sigma$ is a $3$-CLSAG signature. We say a transaction key is valid if the following are satisfied:
+\begin{itemize}
+\item every input ring member $(X_i, C_i, D_i, P_i) \in \textbf{Q}$ has a valid range proof $P_i$ so $\texttt{Ver}(P_i) = 1$; and
+
+\item every output range proof $P_k^\prime$ is valid so $\texttt{Ver}(P_k^\prime)=1$; and
+
+\item for the ring \[\textbf{pk} = \begin{pmatrix} X_1 & X_2 & \cdots & X_n \\ Z_1 & Z_2 & \cdots & Z_n \\ Z_1^\prime & Z_2^\prime & \cdots & Z_n^\prime\end{pmatrix}\] where each $Z_i = C_i - f_C G^\prime - \sum_k C_k^\prime$ and each $Z_i^\prime = D_i - f_D G^\prime - \sum_k D_k^\prime$,  $\texttt{Verify}(m, \underline{\textbf{pk}}, \sigma) = 1$.
+\end{itemize}
+
+This $3$-CLSAG signature demonstrates knowledge of the discrete logarithm of some $x_\ell$, knowledge of the opening information for the input and output commitments, and that the transaction amounts balance  with the fees $f_C$ and $f_D$.  After all, when the amounts in $C_\ell$ and $D_\ell$ balance with the fees $f_C$ and $f_D$ together with the sum of the amounts in each $C_k^\prime$ and $D_k^\prime$, and when the signer knows all the openers for all these commitments, $Z_\ell$ and $Z_\ell^\prime$ can be regarded as usual public keys with base $G$ whose secret key is known by the signer.
+
+Unfortunately, this model does not allow for exchanging amounts of the first color with amounts of the second color. In the next section, we present another toy model that allows for transferring between colors at a fixed/pegged exchange rate.
+
+
+\subsubsection{Mixable colors}\label{sec:mixable}
+We modify the previous example to use a $2$-CLSAG. Consider the canonical example of colored currency with a fixed peg between two colors: dollars and pennies with a $100:1$ exchange rate between them. Define an exchange rate by determining a constant $\xi$ and some constants $\gamma_C, \gamma_D$ on $\left\{1, 2, \ldots, 2^{\xi - 1}\right\}$, (in this example, $\gamma_C = 1$ and $\gamma_D = 100$).
+
+As before, we define a public trading key to be a tuple $(X, C, D, P)$ and a transaction key to be a tuple $(m, \textbf{Q}, \textbf{O}, (f_C, f_D), \sigma, \textit{aux})$. We interpret these identically as in the previous step, except using $2$-CLSAG signatures instead of $3$-CLSAG signatures, and of course we compute them differently. We say a simple transaction key is valid if the following are satisfied:
+\begin{itemize}
+\item every input ring member $(X_i, C_i, D_i, P_i) \in \textbf{Q}$ has a valid range proof $P_i$ so $\texttt{Ver}(P_i) = 1$; and
+
+\item every output range proof $P_k^\prime$ is valid so $\texttt{Ver}(P_k^\prime)=1$; and
+
+\item for the modified ring \[\textbf{pk} = \begin{pmatrix} X_1 & X_2 & \cdots & X_n \\ Z_1 & Z_2 & \cdots & Z_n\end{pmatrix}\] where each $Z_i = \gamma_C (C_i - f_C G^\prime - \sum_k C_k^\prime) + \gamma_D ( D_i - f_D G^\prime - \sum_k D_k^\prime)$, the signature $\sigma$ passes the $2$-CLSAG verification, $\texttt{Verify}(m, \underline{\textbf{pk}}, \sigma) = 1$ .
+\end{itemize}
+
+Unlike the previous example, this example allows for the fixed exchange rate between colors determined by $\gamma_C$ and $\gamma_D$.
+
+
+\section*{Acknowledgments}
+The authors wish to thank the anonymous reviewers of an earlier version of this paper for their comments and valuable suggestions.
+
+
+\bibliographystyle{splncs04}
+\bibliography{bibliography}
+
+\appendix
+
+
+\section{Security proofs}\label{app:proofs}
+We now prove the security theorems from the main text.
+
+\subsection{Unforgeability}\label{app:unforgeability}
+Before we can prove that $d$-CLSAG is unforgeable, we must describe the oracles in greater detail, and produce an algorithm consistent with the forking lemma.
+
+
+\subsubsection{Oracles}
+Random oracle queries made by $\texttt{A}$ are handled by looking to a random tape $\textbf{h}$ available to the simulator to generate hashes for new queries made to the oracle $\mathcal{H}^s$. These are stored in a hash table for consistency in later queries.  We assume whatever algorithm is executing $\texttt{A}$ in a black box has pre-generated a set of private-public key pairs for use in simulating a corruption oracle $\mathcal{CO}$ for $\texttt{A}$. This leaves only the signing oracle, which is simulated through back-patching in the following way.
+
+The simulator reserves the next random oracle query on the random tape $\textbf{h}$ to select $c_{\ell+1}$ for back-patching. The random signature data $\alpha$ and $\left\{s_i\right\}_{i \neq \ell}$ are sampled as usual, and each challenge $c_{i+1}$ for $i \neq \ell$ is simulated from $\textbf{h}$ as described before and stored in a hash table. After all challenges are computed, the simulator compute the group points $L_\ell, R_\ell$, and back-patches their hash table to force $\mathcal{H}^s(\underline{\textbf{pk}} \mid \mid m \mid \mid L_\ell \mid \mid R_\ell) \leftarrow c_{\ell+1}$.
+
+
+\subsubsection{Forgeries}
+A forgery challenger can play the unforgeability game with $\texttt{A}$ in a black box, can simulate $\mathcal{SO}$ and $\mathcal{CO}$, and can check whether the purported forgeries by $\texttt{A}$ are successful; the challenger simply keeps a history of all oracle queries, and computes key images of corrupted keys to check.
+
+This definition allows the attacker to attempt a successful forgery by re-using messages, rings, or indices from previous $\mathcal{SO}$ queries (but not by reusing queries \textit{per totum}). It also allows key images that are unrelated to the ring members and it allows key images found in previous $\mathcal{SO}$ queries. Hence, proving the implementation of Definition \ref{def:clsag} unforgeable under this definition implies these attempts will fail. A forger gains no advantage by re-using messages (or rings or indices) that have already been used in $\mathcal{SO}$. The forger gains no advantage by including key images that are unrelated to the ring members, or by using the key images from $\mathcal{SO}$ queries.
+
+Moreover, consider some $(m, \underline{\textbf{pk}}^\prime, \sigma)$ output by an alleged forger $\texttt{A}$. If the scheme is unforgeable, one of the above conditions must fail. If the signature passes verification, one of the first two conditions must fail, so any valid signature must violate one of these first two conditions. If the first condition is violated, the forger is merely attempting to pass off an oracle signature or some previously computed signature as their own. If the second condition is violated, then $\mathfrak{T}$ corresponds to a corrupted ring member (in which case $\texttt{A}$ knows the key) or corresponds to none of the ring members.
+
+That is to say: if $\texttt{A}$ produces a valid signature, then either $\texttt{A}$ knows the key or the key image does not correspond to a ring member.
+
+Moreover, presume that $\texttt{A}$ produces a message $m$, a ring $\underline{\textbf{pk}}$, and a signature $\sigma$ that passes verification, and yet such that the key image $\mathfrak{T} \in \sigma$ does not correspond to any ring member. Under the random oracle model, $\texttt{A}$ cannot simultaneously satisfy the verification equations
+\begin{align*}
+c_{2} =& \mathcal{H}^s_0(\underline{\textbf{pk}} \mid \mid m \mid \mid s_1 G + c_1 W_1 \mid \mid s_1 H_1 + c_1 \mathfrak{W}) \\
+\vdots & \\
+c_{n} =& \mathcal{H}^s_0(\underline{\textbf{pk}} \mid \mid m \mid \mid s_{n-1} G + c_{n-1} W_{n-1} \mid \mid s_{n-1} H_{n-1} + c_{n-1} \mathfrak{W}) \\
+c_{1} =& \mathcal{H}^s_0(\underline{\textbf{pk}} \mid \mid m \mid \mid s_{n} G + c_{n} W_{n} \mid \mid s_{n} H_{n} + c_{n} \mathfrak{W})
+\end{align*}
+except with negligible probability, because the discrete logarithm of $\mathfrak{W}$ cannot be written as $x_i \mathcal{H}^p(X_i)$ for any $i$. We conclude that $\texttt{A}$ must have known the discrete logarithm of the signing key to produce this signature.
+
+
+\subsubsection{Forking lemma}
+We describe the necessary forking algorithm below, and refer the reader to \cite{bellare} for a proof of this lemma, which demonstrates that if executing some $\texttt{A}$ has non-negligible acceptance probability, then forking $\texttt{A}$ does as well. Since all queries before the $(j^*)^{th}$ query are identical in both transcripts, the input of the $(j^*)^{th}$ query is also identical. Since oracle queries $h_{j^*}^{\prime}, h_{j^*+1}^{\prime}, \ldots$ are newly sampled upon receiving the first output from $\texttt{A}$, the queries $h_{j^*} \neq h_{j^*}^\prime$ except with negligible probability. All subsequent computations in the signature that are common in both transcripts will have the same results only with negligible probability.
+Note that a forger as we have defined is not directly compatible with the forking lemma; the output is some $y = (m, \textbf{pk}, \sigma)$ and no $\textit{idx}$ is included.  However, without loss of generality, we can execute $\texttt{A}$ in a black box that extracts from the transcript of $\texttt{A}$ some $\textit{idx} = (i^*, j^*)$ for $j^* = j(i^*)$ in the following way.
+
+For each query for any $c_{i+1}$ that appears in the successful forgery, there exists a corresponding index $j(i)$ that satisfies $c_{i+1} = h_{j(i)}$. The black box executing $\texttt{A}$ looks at the transcript and extracts the index pair $\textit{idx} = (i^*, j^*)$ that indicates where in the random oracle transcript we can find the very first oracle query made by $\texttt{A}$ to $\mathcal{H}^s$ for some challenge used in signature verification \[c_{i^*+1} = \mathcal{H}^s_0\left(\underline{\textbf{pk}} \mid \mid m \mid \mid L_{i^*} \mid \mid R_{i^*}\right)\] used in the successful forgery. Such a pair $(i^*, j^*)$ can be found by merely inspecting the transcript, so the algorithm wrapping $\texttt{A}$ can output $(\textit{idx}, y)$ without harming its advantage.
+
+Without loss of generality, we can assume that $\texttt{A}$ has been appropriately wrapped so is compatible with the forking lemma without impacting its advantage.
+
+Forking the forger preserves the input to the query $(\underline{\textbf{pk}}, m, L_{i^*}, R_{i^*})$ but does not preserve the challenge $c_{i^*+1}$. Moreover, each $c_{i+1}$ used in the signature verification is computed by $\texttt{A}$ by querying $\mathcal{H}^s$  in the transcript of $\texttt{A}$ leading to a successful forgery; the outputs of these queries cannot be guessed except with negligible probability, and so the oracle must have actually been queried  (see, for example, \cite{liu}). Of course, although the index $i^*$ may not have been decided by $\texttt{A}$ when the query was made, but the index $i^*$ is assigned before the end of the transcript.
+
+That is to say, a forked forger presents two forgeries with the same ring, message, and $\textit{idx}$ except with negligible probability, with the pair of points $L_{i^*}, R_{i^*}$ common in both transcripts.
+
+A forking algorithm $\mathcal{F}^\texttt{A}$ satisfying Lemma \ref{lem:fork} works in the following way.
+
+\begin{enumerate}
+\item $\mathcal{F}$ takes as input some $x$ and $\mathcal{F}$ selects the random tape for $\texttt{A}$.
+
+\item $\mathcal{F}$ selects some $\textbf{h} = (h_1, \ldots, h_q)$ at random by flipping coins, and $\mathcal{F}$ executes $y_\texttt{A} \leftarrow \texttt{A}(x,\textbf{h})$.
+
+\item If $y_{\texttt{A}} = \bot_{\texttt{A}}$, then $\mathcal{F}$ outputs $\bot_{\mathcal{F}}$ and terminates. Otherwise, $y_{\texttt{A}} = (\textit{idx}, y)$ for some $\textit{idx}=(i^*,j^*)$ and some output $y$ and $\mathcal{F}$ selects new oracle queries $h_{j^*}^\prime, h_{j^*+1}^\prime, \ldots, h_q^\prime$, and glues the hash challenges together: $$\textbf{h}^\prime = (h_1, \ldots, h_{j^*-1}, h_{j^*}^\prime, h_{j^*+1}^\prime, \ldots, h_q^\prime)$$
+
+\item If $h_{j^*} = h_{j^{*}}^\prime$, then $\mathcal{F}$ outputs $\bot_{\mathcal{F}}$ and terminates. Otherwise, $h_{j^*} \neq h_{j^{*}}^\prime$ and $\mathcal{F}$ executes $y_\texttt{A}^\prime \leftarrow \texttt{A}(x,\textbf{h}^\prime)$.
+
+\item If $y_{\texttt{A}}^\prime = \bot_{\texttt{A}}$, then $\mathcal{F}$ outputs $\bot_{\mathcal{F}}$ and terminates. Otherwise, $y_{\texttt{A}}^\prime = (\textit{idx}^{\prime}, y^\prime)$. If $\textit{idx} \neq \textit{idx}^\prime$, $\mathcal{F}$ outputs $\bot_{\mathcal{F}}$ and terminates. Otherwise, $\mathcal{F}$ outputs the tuple $(\textit{idx}, y, \textbf{h}, y^\prime, \textbf{h}^\prime)$.
+\end{enumerate}
+
+We note that $\mathcal{F}^{\texttt{A}}$ executed in a black box can be fed the oracle queries $\textbf{h}$ and $\textbf{h}^\prime$ and so these can be assumed to be output as well without loss of generality or impacting acceptance probability. Of course, if $\texttt{A}$ runs in time at most $t$, $\mathcal{F}^{\texttt{A}}$ runs in time at most $2t+s$ where $s$ denotes the time it takes $\mathcal{F}^{\texttt{A}}$ to select the random tape for $\texttt{A}$, select the oracle query sequences $\textbf{h}$ and $\textbf{h}^\prime$, perform lookups in hash tables to maintain oracle query consistency, and outputting the results. These times are all negligible, so $\mathcal{F}^{\texttt{A}}$ runs in $O(2t)$ time.
+
+We are now in a position to present the proof.
+
+\begin{proof}[Unforgeability]
+We construct a master algorithm $\texttt{M}$ that plays the $k$-OMDL game for $k=2d\cdot q_c + d-1$ that operates in the following way. Recall that $\texttt{M}$ is granted access to up to $k$ queries at a discrete logarithm oracle.
+\begin{enumerate}
+
+\item $\texttt{M}$ receives group parameters $(p, \mathbb{G}, G)$ and a list of target group elements $G_1, \ldots, G_{k+1}$ from the $k$-OMDL challenger.
+
+\item $\texttt{M}$ blocks $(G_1, \ldots, G_{k+1})$ into $d$-length blocks and reserve them for public keys using the following equations.
+\begin{align*}
+\textbf{pk}_1 =& (G_1, \ldots, G_d) \\
+\textbf{pk}_2 =& (G_{d+1}, \ldots, G_{2d}) \\
+\vdots & \\
+\textbf{pk}_{2q_c + 1} =& (G_{2q_c d+1}, \ldots, G_{k+1})
+\end{align*}
+
+\item $\texttt{M}$ uses $\left\{\textbf{pk}_i\right\}_{i=1}^{2q_c + 1}$ as input for $\mathcal{F}^{\texttt{A}}$, responding to corruption oracle queries made by $\mathcal{F}^{\texttt{A}}$ for a key $\textbf{pk}_i$ by querying $\mathcal{CO}$ directly with each coordinate and responding with the result. Denote $X_i := G_{(i-1)d + 1}$ and $Z_{i,j} := G_{(i-1)d + 1 + j}$ for consistency with our earlier notation.
+
+\item If $\mathcal{F}^{\texttt{A}}$ outputs $\bot$, so does $\texttt{M}$ and $\texttt{M}$ terminates. Otherwise, $\mathcal{F}^{\texttt{A}}$ succeeds executing $\texttt{A}$ twice, each time taking no more than $q_c$ queries to corrupt $d$-dimensional keys, resulting in no more than $2\cdot d\cdot q_c$ queries to the discrete logarithm oracle $\mathcal{CO}$. $\mathcal{F}^{\texttt{A}}$ produces $(\textit{idx}, y, \textbf{h}, y^\prime, \textbf{h}^\prime)$ where $y = (m, \underline{\textbf{pk}}, \sigma)$ and $y^\prime = (m, \underline{\textbf{pk}}, \sigma^\prime)$ are forgeries using oracle queries $\textbf{h}$ and $\textbf{h}^\prime$, respectively, and $\textit{idx} = (i^*, j^*)$ as described previously.
+
+The messages and rings are identical in these forgeries because they must have been selected before the first challenge query, except with negligible probability. So $\texttt{M}$ can parse
+\begin{align*}
+y =& (m, \underline{\textbf{pk}}, \sigma) & \sigma =& (c_1, s_1, \ldots, s_n, \mathfrak{T}, \left\{\mathfrak{D}_j\right\}_j) \\
+y^\prime =& (m, \underline{\textbf{pk}}, \sigma^\prime) & \sigma^\prime =& (c_1^\prime, s_1^\prime, \ldots, s_n^\prime, \mathfrak{T}^\prime, \left\{\mathfrak{D}_j^\prime\right\}_j)\end{align*} except with negligible probability (in which case $\texttt{M}$ outputs $\bot_{\texttt{M}}$ and terminates).
+
+\item In the transcript of $\mathcal{F}^{\texttt{A}}$, $\texttt{M}$ can find $c_{i^*+1} = \textbf{h}_{j^*}$ and in the second transcript $c_{i^*+1} = \textbf{h}^\prime_{j^*}$ for some $\textbf{h}_{j^*} \neq \textbf{h}^\prime_{j^*}$, except with negligible probability (in which case $\texttt{M}$ outputs $\bot_{\texttt{M}}$ and terminates).
+
+\item $\texttt{M}$ parses the random oracle transcript to find the query yielding the signature challenge  $c_{i^*+1} \leftarrow \mathcal{H}^s(\underline{\textbf{pk}} \mid \mid m \mid \mid L_{i^*} \mid \mid R_{i^*})$. Both transcripts match until this line, and the oracle responses stored in $c_{i^*+1}$ in these transcripts don't match (i.e.\ $\textbf{h}_{j^*} \neq \textbf{h}^\prime_{j^*}$ except with negligible probability). The algorithm  $\texttt{M}$ parses the first transcript to look for constants $s_{i^*}, c_{i^*}$ and the group point $W = \mu_X X_{i^*} + \sum_j \mu_j Z_{i^*, j}$ such that $L_{i^*} = s_{i^*} G + c_{i^*} W$. From the second transcript, and with the same $L_{i^*}$ and $W$, $\texttt{M}$ parses to find constants $s_{i^*}^\prime, c_{i^*}^\prime$ such that $L_{i^*} = s_{i^*}^\prime G + c_{i^*}^\prime W$.
+
+\item If $\mu_X = 0$ then $\texttt{M}$ outputs $\bot$ and terminates. Otherwise, $\texttt{M}$ computes the discrete logarithm
+$$w = \frac{s_{i^*}^\prime - s_{i^*}}{c_{i^*} - c_{i^*}^\prime}$$ without querying $\mathcal{CO}$.
+
+\item $\texttt{M}$ makes up to $d-1$ queries to $\mathcal{CO}$ to find the discrete logarithms of the elements of any $(d-1)$-subset of $\left\{X_{i^*}, Z_{i^*, 1}, \ldots, Z_{i^*, d-1}\right\}$.
+
+\item $\texttt{M}$ uses $w$ to solve for the final discrete logarithm.
+
+\item $\texttt{M}$ outputs the $2 \cdot d \cdot q_c$ corruptions queries and the $d$-dimensional vector $(x_{i^*}, z_{i^*, 1}, \ldots, z_{i^*, d-1})$, totaling $k+1$ discrete logarithms.
+\end{enumerate}
+
+Note that if $\texttt{M}$ does not terminate and output $\bot$, then $\texttt{M}$ makes up to $2\cdot d \cdot q_c$ queries to $\mathcal{CO}$ for $\mathcal{F}^{\texttt{A}}$ and makes an an additional $d-1$ queries to $\mathcal{CO}$, and yet produces as output $d \cdot (q_c + 1) > d \cdot q_c + d-1$ discrete logarithms, \textit{i.e.}\ $\texttt{M}$ successfully plays the $k$-OMDL game for $k = 2\cdot d\cdot q_c + d-1$. Furthermore,  if $\texttt{M}$ already corrupted these discrete logarithms, even fewer queries could be made, tightening $k$ and making $\texttt{M}$ a more powerful solver.
+
+Also note that, as previously mentioned, since the map $(x, z_1, \ldots, z_{d-1}) \mapsto w$ is collision resistant, $\texttt{M}$ can skip steps and guess $w$ in step $7$ only with negligible success.
+
+Recall that $\mathcal{F}^{\texttt{A}}$ takes time $O(2t)$ to execute. $\texttt{M}$ executes $\texttt{F}^{\texttt{A}}$ and then performs parsing of transcripts and some additional computations, so $\texttt{M}$ takes time $O(2t+s^\prime)$ for some $s^\prime$ due to parsing and processing transcript data.
+
+The additional time $s^\prime$ is due to:
+\begin{itemize}
+\item Lookup time in a hash table for each $\mathcal{CO}$ query, each random oracle query, and each extraction of a value from the random tapes $\textbf{h}$, $\textbf{h}^\prime$ by $\mathcal{F}^{\texttt{A}}$ throughout the transcript.
+\item Parsing and constructing keys in step $2$.
+\item Parsing purported forgeries in step $3$.
+\item Parsing transcripts and computing multi-exponentiations to verify equations in step $5$.
+\item Computing the discrete logarithm $w$ using field arithmetic in Step $6$.
+\item Computing the discrete logarithm of the challenge key using field arithmetic in step $8$.
+\item Outputting the results.
+\end{itemize}
+All of these are negligible, so $\texttt{M}$ also takes time $O(2t)$.
+
+To complete the proof using $\texttt{M}$, suppose $d, q_h, q_c, q_s$ satisfy the hypotheses and let $\texttt{A}$ be a $(t, \epsilon, q_h, q_c, q_s, \kappa)$-forger of the $d$-CLSAG scheme, and let $\mathcal{F}^{\texttt{A}}$ be the forking algorithm for $\texttt{A}$. $\texttt{M}$ terminates and outputs $\bot$ in steps $3$ and $6$ only; otherwise, $\texttt{M}$ succeeds at the $k$-OMDL game. Hence, if $E_3$ is the event that $\texttt{M}$ outputs $\bot$ in step $3$ and $E_6$ is the event that $\texttt{M}$ outputs $\bot$ in step $6$, then $E_3, E_6$ are disjoint and the acceptance probability for $\texttt{M}$ is $1 - \mathbb{P}(E_3 \cup E_6) =  1 - \mathbb{P}(E_3) - \mathbb{P}(E_6)$. The probability that $\texttt{M}$ outputs $\bot$ in step $6$ is the probability that the hashed coefficient $\mu_X = 0$, which occurs with probability $p^{-1}$.  $\texttt{M}$ outputs $\bot$ in step $3$ when $\mathcal{F}^{\texttt{A}}$ produces $\bot$, but the forking lemma gives us that the acceptance probability of $\mathcal{F}^\texttt{A}$ is bounded from below by $\epsilon\left(\frac{\epsilon}{q_c} - \frac{1}{2^\eta}\right)$. Hence, $\texttt{M}$ succeeds with probability at least $ \left(\epsilon\left(\frac{\epsilon}{q_c} - \frac{1}{2^\eta}\right) - p^{-1}\right)$.
+\end{proof}
+
+
+\subsection{Linkability}
+We now prove linkability.
+
+\begin{proof}[Linkability]
+Suppose $\texttt{A}$ is such a solver for $q \geq 1$. Among all tuples $\{(M_i, \underline{\textbf{pk}}_i^\prime, \sigma_i)\}_{i=1}^{q+1}$ returned by $\texttt{A}$, where $J_i \in \sigma_i$ is a signature's linking tag, we claim that there exists some $i$ such that $J_i$ does not correspond to any ring member in $\underline{\textbf{pk}}_i^\prime$.
+
+Indeed, the map from public keys to linking tags in the $d$-CLSAG construction is injective with high probability. If each linking tag $J_i$ (of which there are $q + 1$) corresponds to some public key in $\underline{\textbf{pk}}_i^\prime$, then there must exist at least two such tags that are equal, by the pigeonhole principle. But since $\texttt{Link}(\sigma_i,\sigma_j) = 0$ for all $i \neq j$, then by definition all linking tags are unique, a contradiction.
+
+Therefore, there exists such an index $i$. But $\texttt{A}$ did not query a signing oracle to obtain $\sigma_i$ in the game, and $\texttt{Verify}(M_i, \underline{\textbf{pk}}_i^\prime, \sigma_i) = 1$; this corresponds to a forgery.
+\end{proof}
+
+
+\subsection{Non-frameability}
+We show non-frameability.
+
+\begin{proof}[Non-frameability]
+Suppose that $\texttt{A}$ is such a solver. Since $\texttt{Link}(\sigma,\sigma^\prime) = 1$, then by definition the corresponding linking tags $J$ and $J^\prime$ must be equal, and $J$ corresponds to the ring member $\textbf{pk}$ used in the signing oracle query that produced $\sigma$.
+
+However, no signing oracle query produced $\sigma^\prime$, and the corruption oracle was not queried on $\textbf{pk}$, so $\texttt{A}$ has produced a forgery $\sigma^\prime$.
+\end{proof}
+
+
+\subsection{Linkable anonymity}
+To show that our construction has linkable anonymity, we first make observations about the DDH game.
+
+Note any algorithm can flip a coin and guess correctly half the time. We say the \textit{advantage} of $\texttt{A}$ is the difference between the probability of success for $\texttt{A}$ and $1/2$. Moreover, due to the random self-reducibility of the DDH game, a $(t, \epsilon, \kappa)$-solver of the DDH game presented implies the existence of a $(t^\prime, \epsilon^\prime, 1)$-solver, which is the usual DDH game.
+
+\begin{remark}
+If $\mathbb{G}$ satisfies the DDH hardness assumption, then the distribution of the triple of group elements $(r_1G, r_2G, r_3G)$ is computationally indistinguishable from the triple $(r_1G, r_2G, r_1r_2G)$,  where the $r_i$ are independently uniform on $\mathbb{F}_p$. If $\mathcal{H}^p: \left\{0,1\right\}^* \to \mathbb{G}$ is modeled as a random oracle with output that is independent of its input, the distribution of a tuple $(r_1G, r_2G, r_3G)$ is identical to the distribution of $(r_1G, \mathcal{H}^p(r_1G), r_3G)$ where $r_1, r_3$ are independently uniform on $\mathbb{F}_p$. Hence, under the random oracle model and assuming $\mathbb{G}$ is DDH-hard, the distribution of triples $(r_1G, \mathcal{H}^p(r_1G), r_1\mathcal{H}^p(r_1G))$ where $r_1$ is uniformly random from $\mathbb{F}_p$ is computationally indistinguishable from the distribution of triples $(r_1G, \mathcal{H}^p(r_1G), r_3G)$ where $r_1, r_3$ are uniformly random from $\mathbb{F}_p$.
+
+Now note that a solver of the signer ambiguity game is given $X_i$ and $\mathcal{H}^p(X_i)$ for each ring member and the key image $\mathfrak{T} = x_\ell \mathcal{H}^p(X_\ell)$. The solver with a non-negligible advantage at guessing $\ell$ has a non-negligible advantage in distinguishing whether a given triple $(X_i, \mathcal{H}^p(X_i), \mathfrak{T})$ satisfies $\mathfrak{T} = x_i \mathcal{H}^p(X_i)$ or not.
+\end{remark}
+
+\begin{proof}[Linkable anonymity]
+We assume that $\texttt{A}$ is a $(t, \epsilon, \kappa)$-solver of the linkable anonymity game of Definition \ref{linkable-anonymity-game}. We assume that $\texttt{A}$ successfully outputs a bit before time $t$, i.e.\ $\texttt{A}$ is willing to flip a coin rather than output a distinguished failure symbol like $\bot_{\texttt{A}}$. We can always wrap $\texttt{A}$ in another algorithm that flips its own coin without losing generality, so this assumption is a reasonable one.
+
+We construct a master algorithm $\texttt{M}$ that runs $\texttt{A}$ as a subroutine and plays the game of Definition \ref{ddhgame}, specified as follows.
+
+\begin{enumerate}
+\item $\texttt{M}$ receives $\kappa$ DDH challenge tuples $\left\{(R_{i,1}, R_{i,2}, R_{i,3}^{(b)})\right\}_{i=0}^{\kappa - 1}$. $\texttt{M}$ sets $X_i := R_{i,1}$, instantiates hash tables for $\mathcal{H}^p$ and $\mathcal{H}^s$, back-patches $\mathcal{H}^p(X_i) \leftarrow R_{i,2}$, and defines $\mathfrak{T}_{i} := R_{i, 3}^{(b)}$ for each $i$.
+
+\item $\texttt{M}$ selects $z_{i,j}$ at random, sets $Z_{i,j} = z_{i,j} G$, sets $\textbf{pk}_i^* := (X_i, Z_{i,1}, \ldots, Z_{i,d-1})$, and computes the dummy challenge keys $\mathfrak{D}_j$. It selects a random bit $\overline{b} \in \{0,1\}$.
+
+\item $\texttt{M}$ executes $\texttt{A}$ as a black box using the set $\underline{\textbf{pk}}^*$ as challenge keys (and simulating appropriate oracle query responses for $\texttt{A}$ as described below).
+
+\item $\texttt{A}$ outputs a bit $\overline{b}^\prime$. If $\overline{b}^\prime = \overline{b}$, then $\texttt{M}$ outputs $0$ and terminates. Otherwise, $\texttt{M}$ outputs $1$ and terminates.
+
+\end{enumerate}
+
+
+The algorithm $\texttt{M}$ handles random oracle queries made by $\texttt{A}$ by flipping random coins and keeping consistency with an internal hash table. The algorithm $\texttt{M}$ handles signature oracle queries made by $\texttt{A}$, say $(m, \underline{\textbf{pk}}, \textbf{pk})$, by retrieving the challenge triple $(R_{i, 1}, R_{i, 2}, R_{i, 3}^{(b)})$ corresponding to each ring member and back-patching the signature as usual:
+\begin{enumerate}[(a)]
+\item $\texttt{M}$ selects a random scalars $c_{\ell^*+1}, s_1, s_2, \ldots, s_n \in \mathbb{F}_p$.
+
+\item For $\ell=\ell^*+1, \ell^*+2, \ldots, n-1, n, 1, 2, \ldots, \ell^*-1$, $\texttt{M}$ computes
+\begin{align*}
+L_\ell :=& s_\ell G + c_\ell\left(\mu_X X_{i(\ell)} + \sum_j \mu_j Z_{i(\ell),j}\right) \\
+R_\ell :=& s_\ell\mathcal{H}^p(X_{i(\ell)}) + c_\ell\left(\mu_X \mathfrak{T}_{i(\ell)} + \sum_j \mu_j \mathfrak{D}_j\right)\\
+c_{\ell+1} :=& \mathcal{H}^s\left(\underline{\textbf{pk}}^\prime \mid \mid m \mid \mid L_\ell \mid \mid R_\ell \right).
+\end{align*}
+
+\item $\texttt{M}$ computes $c_{\ell^*}$, $L_{\ell^*}$, and $R_{\ell^*}$ as above. If $\mathcal{H}^s$ has been queried before with $\left(\underline{\textbf{pk}}^\prime \mid \mid m \mid \mid L_{\ell^*} \mid \mid R_{\ell^*} \right)$, $\texttt{M}$ outputs $\bot$ and terminates. Otherwise, $\texttt{M}$ backpatches $\mathcal{H}^s\left(\underline{\textbf{pk}}^\prime \mid \mid m \mid \mid L_{\ell^*} \mid \mid R_{\ell^*} \right) \leftarrow c_{\ell^*+1}$.
+
+\item $\texttt{M}$ sends the signature $\sigma = (c_1, s_1, \ldots, s_n, \left\{\mathfrak{D}_j\right\}_j)$ and tag $R_{i, 3}^{(b)}$ to $\texttt{A}$.
+\end{enumerate}
+
+Note that $\texttt{M}$ only terminates and outputs $\bot$ if $\texttt{A}$ asks for a signature with a ring not containing the challenge points, or if $\mathcal{H}^s$ has been queried with $\left(\underline{\textbf{pk}}^\prime \mid \mid m \mid \mid L_\ell \mid \mid R_\ell \right)$ before step $4c$. We can assume $\texttt{A}$ never asks for a signature with a bad ring like this. Moreover, the points $L_\ell$ and $R_\ell$ are uniformly distributed, so the probability that any algorithm can guess the input for backpatching is negligible. Hence, $\texttt{M}$ carries out the game in Definition \ref{ddhgame} except with negligible probability.
+
+The law of total probability gives us that $\mathbb{P}\left[\texttt{M}\text{ wins}\right] = \frac{1}{2}\mathbb{P}\left[\texttt{M} \rightarrow 1 \mid b=1\right] + \frac{1}{2}\mathbb{P}\left[\texttt{M} \rightarrow 0 \mid b=0\right]$.
+Observe that the event $\texttt{M} \rightarrow 0$ is precisely the event that $\texttt{A} \rightarrow \overline{b}' = \overline{b}$. Similarly, the event $\texttt{M} \rightarrow 1$ is precisely the event that $\texttt{A} \rightarrow \overline{b}' \neq \overline{b}$.
+If $b = 1$ in the DDH game, then $\texttt{M}$ received random points instead of DDH exchange keys, so signature oracle points are random and $\texttt{A}$ has no advantage in the linkable anonymity game; hence $\mathbb{P}\left[\texttt{A} \rightarrow \overline{b}' = \overline{b} \mid b = 1\right] = \mathbb{P}\left[\texttt{A} \rightarrow \overline{b}' \neq \overline{b} \mid b = 1\right] = \frac{1}{2}$.
+However, if $b = 0$ in the DDH game, then $\texttt{M}$ received DDH exchange keys, and $\texttt{A}$ has an advantage $\epsilon$ in the linkable anonymity game; hence we can state that $\mathbb{P}\left[\texttt{A} \rightarrow \overline{b}' = \overline{b} \mid b = 0\right] = \frac{1}{2} + \epsilon$.
+Therefore:
+\begin{eqnarray*}
+\mathbb{P}\left[\texttt{M}\text{ wins}\right] &=& \frac{1}{2}\mathbb{P}\left[\texttt{M} \rightarrow 1 \mid b=1\right] + \frac{1}{2}\mathbb{P}\left[\texttt{M} \rightarrow 0 \mid b=0\right] \\
+&=& \frac{1}{2}\mathbb{P}\left[\texttt{A} \rightarrow \overline{b}' \neq \overline{b} \mid b = 1\right] + \mathbb{P}\left[\texttt{A} \rightarrow \overline{b}' = \overline{b} \mid b = 0\right] \\
+&=& \frac{1}{2}\left(\frac{1}{2}\right) + \frac{1}{2}\left(\frac{1}{2} + \epsilon\right) \\
+&=& \frac{1}{2} + \frac{\epsilon}{2}.
+\end{eqnarray*}
+This completes the proof.
+\end{proof}
+
+\end{document}
