@@ -1,6 +1,6 @@
 # Triptych analysis
 
-This analysis examines size and verification time estimates for Triptych transactions. Triptych is a placeholder name for the linkable ring signature construction [proposed by RandomRun](https://github.com/monero-project/research-lab/issues/56). Monero Research Lab [proof-of-concept code](https://github.com/SarangNoether/skunkworks/tree/triptych) is also available, but should not be used in production.
+This analysis examines size and verification time estimates for Triptych transactions. Triptych is a linkable ring signature construction [proposed by RandomRun](https://github.com/monero-project/research-lab/issues/56) and described in a [preprint](https://eprint.iacr.org/2020/018). Monero Research Lab [proof-of-concept code](https://github.com/SarangNoether/skunkworks/tree/triptych) is also available, but should not be used in production.
 
 Important assumptions and notes:
 - only group operations are considered for timing purposes
