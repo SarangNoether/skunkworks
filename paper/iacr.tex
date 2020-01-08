@@ -184,7 +184,7 @@ We will show that the sigma protocol is complete, sound, and zero-knowledge, the
 Informally, we require the protocol be:
 \begin{itemize}
 \item \textit{Perfectly complete}: Given knowledge of a witness to a statement in the proof relation, an honest prover can always convince an honest verifier of the validity of the witness.
-\item \textit{Special sound}: Given a statement in the proof relation, if a prover can answer multiple honest verifier challenges correctly, then it is possible to extract a witness for this statement.
+\item \textit{Special sound}: Given a statement in the proof relation, if a prover can answer multiple verifier challenges correctly, then it is possible to extract a witness for this statement.
 \item \textit{Special honest-verifier zero knowledge}: Given any statement and verifier challenge, it is possible to simulate a transcript that is accepted by an honest verifier without knowledge of a corresponding witness.
 \end{itemize}
 
@@ -523,7 +523,7 @@ $$\mathcal{P}_{par}(\{M_i\},\{P_i-P'_u\},r_u^{-1}U;(l_u,r_u,s_u-s'_u))$$
 
 For $j \in [0,T)$, the user generates a fresh output of the form $Q_j \equiv \com(b_j,t_j)$ for amount $b_j$ and mask $t_j$.
 The masks are chosen such that for $j \in [1,T)$, we have $t_j$ chosen uniformly at random from $\F$.
-We then choose $$t_0 \equiv \sum_{u=0}^{W-1} s_u' -\sum_{j=1}^{t-1} t_j$$ and include all $\{P'_u\}$ auxiliary commitments in the transaction.
+We then choose $$t_0 \equiv \sum_{u=0}^{W-1} s_u' -\sum_{j=1}^{T-1} t_j$$ and include all $\{P'_u\}$ auxiliary commitments in the transaction.
 
 To verify such a transaction, the verifier first performs verification on each spend proof to ensure it is valid.
 Then, the verifier ensures that $$\sum_{u=0}^{W-1} P'_u - \sum_{j=0}^{T-1} Q_j = 0$$ such that the transaction balances.
@@ -535,30 +535,32 @@ Triptych proofs scale logarithmically with the size of the input anonymity set; 
 Related protocols based on the inner-product compression method of \cite{bulletproofs} include Omniring \cite{omniring} and RingCT 3.0 \cite{omniring}.
 However, it is challenging to directly compare these protocols' efficiency.
 Omniring includes all transaction input signatures, output range proofs, and balance within a single proof structure; however, it is not possible to verify a batch of proofs more efficiently by combining common generators.
-While an early version of RingCT 3.0 used separate input, range, and balance proofs, the most recent version merges all input and balance proofs together but outsources the range proofs to an efficient construction like \cite{bulletproofs}; this comes at the cost of requiring that the number of inputs be a power of two or otherwise carefully padded.
-A more direct comparison is to CLSAG, a linear-sized linkable ring signature construction.
+While an early version of RingCT 3.0 used separate input, range, and balance proofs, the most recent version merges all input and balance proofs together but outsources the range proofs to an efficient construction like \cite{bulletproofs}; this comes at the cost of requiring that the number of inputs be a power of two or otherwise carefully padded (affecting verification time).
+Therefore, for the purpose of comparison we modify slightly the earlier version of RingCT 3.0 with a soundness fix applied from the updated version, ignoring the size and verification cost of non-proof elements.
+Another more direct comparison is to $2$-CLSAG, a linear-sized linkable ring signature construction \cite{clsag}.
 
-We compare size and verification of parallel Triptych, the earlier version of RingCT 3.0 considering only the signature proof component, and CLSAG.
-For verification scaling, we account for the use of batching in Triptych and RingCT 3.0, where generators common to multiple proofs are used only once in verification.
+We now show size and verification comparisons of the parallel instantiation of Triptych, the earlier (modified) version of RingCT 3.0, and $2$-CLSAG.
+For verification scaling, we also account for the use of batching in Triptych and RingCT 3.0, where generators common to multiple proofs are used only once in verification.
 Further, since verification in both of these constructions reduces to checking whether several multiscalar multiplications are zero, we may apply random weighting such that verifying a batch of multiple proofs reduces to a single multiscalar multiplication.
 The use of efficient multiscalar multiplication algorithms like \cite{straus,pippenger} means that an $n$-multiscalar multiplication evaluates as $O(n/\log n)$.
 This form of batching does not apply to CLSAG, where verification consists of a sequence of hash function evaluations.
 
-Table \ref{table:size} compares proof/signature sizes and verification complexity for these constructions.
+Table \ref{table:size} compares proof/signature sizes and verification complexity for these constructions as a function of the anonymity set size $N$ and batch size $B$.
 Verification complexity is separated into the number of hash-to-$\F$ operations (denoted $\hs$), hash-to-$\G$ operations (denoted $\hp$), and $i$-multiscalar multiplication operations of size $k(i)$.
-Figure \ref{fig:size} examines size as a function of input anonymity size under the assumption that elements of both $\G$ and $\F$ occupy $32$ kB of space.
-We note that although RingCT 3.0 proofs are smaller for large $N$, Triptych proofs are smaller in the range $16 < N < 1024$, a reasonable range given practical verification times.
+Figure \ref{fig:size} examines size as a function of input anonymity set size, under the assumption that elements of both $\G$ and $\F$ occupy $32$ kB of space.
+We note that although RingCT 3.0 proofs are slightly smaller for large $N$, Triptych proofs are smaller for $N < 512$, a limited but reasonable range given practical verification times.
+We also note that the application of Triptych in a complete transaction protocol is not directly compared to RingCT 3.0 here, as the use of non-proof/signaure auxiliary data in such a protocol may differ based on particular implementations.
 
 \begin{table}[h]
 \centering
 \begin{tabular}{r|ll|l}
-& Size ($\G$) & Size ($\F$) & Verification \\
+& Size ($\G$) & Size ($\F$) & Verification (batch total) \\
 \hline
-CLSAG \cite{clsag} & $1$ & $N + 1$ & $(N + 2) \hs + N \hp + 2N k(3)$ \\
-RingCT 3.0 \cite{rct3} & $2\lg(N) + 8$ & $10$ & $k(4N + 2\lg(N) + 16)$ \\
-Triptych (this work) & $2\lg(N) + 5$ & $\lg(N) + 3$ & $k(2N + 4\lg(N) + 8)$
+CLSAG \cite{clsag} & $2$ & $N + 1$ & $B(N + 2) \hs + BN \hp + 2BN k(3)$ \\
+RingCT 3.0 \cite{rct3} & $2\lg(N) + 9$ & $9$ & $k(B[2N + 2\lg(N) + 9] + 2N + 5)$ \\
+Triptych (this work) & $2\lg(N) + 6$ & $\lg(N) + 3$ & $k(B[2N + 2\lg(N) + 2] + 2\lg(N) + 3)$
 \end{tabular}
-\caption{Proof sizes and verification complexity, for anonymity set size $N$}
+\caption{Proof sizes and verification complexity, for anonymity set size $N$ and batch size $B$}
 \label{table:size}
 \end{table}
 
