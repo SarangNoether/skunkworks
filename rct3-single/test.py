@@ -26,7 +26,7 @@ class Coin:
         # Sanity checks
         if not isinstance(v,Scalar):
             raise TypeError('Invalid coin value!')
-        if v > Scalar(2)**BITS - 1:
+        if v > Scalar(2)**BITS - Scalar(1):
             raise ValueError('Value is out of range!')
         if not isinstance(X1,Point) or not isinstance(X2,Point):
             raise TypeError('Invalid destination address!')
