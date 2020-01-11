@@ -41,8 +41,8 @@ def inner_product(data):
     n /= 2
     cL = data.a[:n]**data.b[n:]
     cR = data.a[n:]**data.b[:n]
-    data.L.append(data.G[n:]*data.a[:n] + data.H[:n]*data.b[n:] + data.U*cL)
-    data.R.append(data.G[:n]*data.a[n:] + data.H[n:]*data.b[:n] + data.U*cR)
+    data.L.append(data.G[n:]**data.a[:n] + data.H[:n]**data.b[n:] + data.U*cL)
+    data.R.append(data.G[:n]**data.a[n:] + data.H[n:]**data.b[:n] + data.U*cR)
 
     mash(data.L[-1])
     mash(data.R[-1])
@@ -69,7 +69,7 @@ def test(a,b,N):
 
     # The compound commitment
     t = a**b
-    P = Gi*a + Hi*b + U*t
+    P = Gi**a + Hi**b + U*t
     mash(P)
     mash(t)
 
