@@ -49,7 +49,7 @@ for i in range(M):
 
 # Layer-1 proof
 proof1,state = groth.prove_initial(d,l,v+masks_v[l],r+masks_r[l],n_M,m_M)
-state.x = groth.challenge([proof1])
+state.x = groth.challenge(d,[proof1])
 proof1 = groth.prove_final(proof1,state)[0] # ignore gamma return value for this test
 
 # Fiat-Shamir challenges
@@ -71,11 +71,11 @@ for i in range(M):
     mask_v += x[i]*masks_v[i]
     mask_r += x[i]*masks_r[i]
 proof2,state = groth.prove_initial([digest_d - D[i] for i in range(T)],k,mask_v,mask_r,n_T,m_T)
-state.x = groth.challenge([proof2])
+state.x = groth.challenge([digest_d - D[i] for i in range(T)],[proof2])
 proof2 = groth.prove_final(proof2,state)[0] # ignore gamma return value for this test
 
 # Verify the layer-1 proof
-groth.verify(d,proof1,n_M,m_M,groth.challenge([proof1]))
+groth.verify(d,proof1,n_M,m_M,groth.challenge(d,[proof1]))
 
 # Verify the layer-2 proof
-groth.verify([digest_d - D[i] for i in range(T)],proof2,n_T,m_T,groth.challenge([proof2]))
+groth.verify([digest_d - D[i] for i in range(T)],proof2,n_T,m_T,groth.challenge([digest_d - D[i] for i in range(T)],[proof2]))

@@ -100,15 +100,15 @@ def inner_product(data):
     n /= 2
     cL = data.a[:n]**data.b[n:]
     cR = data.a[n:]**data.b[:n]
-    data.L.append((data.G[n:]*data.a[:n] + data.H[:n]*data.b[n:] + data.U*cL)*inv8)
-    data.R.append((data.G[:n]*data.a[n:] + data.H[n:]*data.b[:n] + data.U*cR)*inv8)
+    data.L.append((data.G[n:]**data.a[:n] + data.H[:n]**data.b[n:] + data.U*cL)*inv8)
+    data.R.append((data.G[:n]**data.a[n:] + data.H[n:]**data.b[:n] + data.U*cR)*inv8)
 
     data.tr.update(data.L[-1])
     data.tr.update(data.R[-1])
     x = data.tr.challenge()
 
-    data.G = (data.G[:n]*x.invert())*(data.G[n:]*x)
-    data.H = (data.H[:n]*x)*(data.H[n:]*x.invert())
+    data.G = data.G[:n]*x.invert() + data.G[n:]*x
+    data.H = data.H[:n]*x + data.H[n:]*x.invert()
 
     data.a = data.a[:n]*x + data.a[n:]*x.invert()
     data.b = data.b[:n]*x.invert() + data.b[n:]*x
@@ -141,12 +141,12 @@ def prove(data,N):
         aR.append(bit-Scalar(1))
 
     alpha = random_scalar()
-    A = (Gi*aL + Hi*aR + G*alpha)*inv8
+    A = (Gi**aL + Hi**aR + G*alpha)*inv8
 
     sL = ScalarVector([random_scalar()]*(M*N))
     sR = ScalarVector([random_scalar()]*(M*N))
     rho = random_scalar()
-    S = (Gi*sL + Hi*sR + G*rho)*inv8
+    S = (Gi**sL + Hi**sR + G*rho)*inv8
 
     # get challenges
     tr.update(A)

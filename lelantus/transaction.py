@@ -145,7 +145,7 @@ class SpendTransaction:
             spend_states.append(spend_state)
 
         # Compute aggregate Fiat-Shamir challenge
-        x = groth.challenge(self.spend_proofs)
+        x = groth.challenge(C_list,self.spend_proofs)
 
         # Complete spend proofs
         self.spend_sigs = []
@@ -208,7 +208,7 @@ class SpendTransaction:
             signature.verify(repr(self.spend_proofs[i]),self.Q[i],self.spend_sigs[i])
 
         # Verify the spend proofs
-        x = groth.challenge(self.spend_proofs)
+        x = groth.challenge(self.C_list,self.spend_proofs)
         for i in range(len(self.spend_proofs)):
             s = hash_to_scalar(self.Q[i])
             offset = groth.comm(s,Scalar(0),Scalar(0))
