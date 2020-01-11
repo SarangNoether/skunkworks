@@ -9,7 +9,7 @@
 \linenumbers % TODO: remove
 
 \title{Concise Linkable Ring Signatures and Applications}
-\institute{Monero Research Lab, \email{\{surae,sarang\}@getmonero.org} \and Independent researcher, \email{randomrun@protonmail.com}}
+\institute{Monero Research Lab, \email{\{surae,sarang\}.noether@protonmail.com} \and Independent researcher, \email{randomrun@protonmail.com}}
 \author{Brandon Goodell\inst{1} \and Sarang Noether\inst{1} \and Arthur Blue\inst{2}}
 
 \begin{document}
@@ -17,7 +17,7 @@
 
 
 \begin{abstract}
-We describe a generalization of linkable ring signatures, $d$-linkable ring signatures ($d$-LRS). These admit $d$-dimensional vectors of keys with a specified linking coordinate, but do not have signature sizes linear in $d$. We then produce an efficient $d$-LRS construction, called \textit{concise linkable spontaneous anonymous group} signatures (CLSAG), that are smaller than existing constructions without a trusted setup used in production, and are more efficient in verification over a reasonable range of anonymity set sizes. Security is proven using the $k$-one more discrete logarithm and decisional Diffie-Hellman hardness assumptions to show correctness, unforgeability, linkable anonymity, linkability, and non-frameability. We describe direct applications to signer-ambiguous confidential transactions with single or multiple asset classes.
+We describe and formalize a generalization of linkable ring signatures, $d$-linkable ring signatures ($d$-LRS), that admit multidimensional vectors of keys with a specified linking coordinate. These signatures are useful in trust-free signer-ambiguous transaction protocols and distributed ledger applications, but signature sizes for current implementations are $O(nd)$ for signer ambiguity set size $n$. We produce a new efficient $d$-LRS construction with signature size $O(n + d)$, producing smaller signatures that are faster to produce and verify over a reasonable range of anonymity set sizes than currently-deployed solutions. Security is proven using the $k$-one-more discrete logarithm and decisional Diffie-Hellman hardness assumptions to show correctness, unforgeability, linkable anonymity, linkability, and non-frameability. We describe useful applications to signer-ambiguous confidential transactions with single or multiple asset classes.
 \end{abstract}
 
 
@@ -226,7 +226,7 @@ Anonymity set & MLSAG & CLSAG & MLSAG & CLSAG \\
 
 
 \section{Security model}\label{sec:security}
-We now introduce the hardness assumptions and security definitions that apply to a $d$-LRS construction (and, implicitly, to an LRS construction). In particular, we rely on the $k$-one more discrete logarithm ($k$-OMDL) and decisional Diffie-Hellman (DDH) hardness assumptions for our definitions.
+We now introduce the hardness assumptions and security definitions that apply to a $d$-LRS construction (and, implicitly, to an LRS construction). In particular, we rely on the $k$-one-more discrete logarithm ($k$-OMDL) and decisional Diffie-Hellman (DDH) hardness assumptions for our definitions.
 
 
 \subsection{Hardness assumptions and useful results}\label{sec:assumptions}
