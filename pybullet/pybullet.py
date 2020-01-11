@@ -138,15 +138,15 @@ def inner_product(data):
     n /= 2
     cL = a[:n]**b[n:]
     cR = a[n:]**b[:n]
-    L = (G[n:]*a[:n] + H[:n]*b[n:] + U*cL)*inv8
-    R = (G[:n]*a[n:] + H[n:]*b[:n] + U*cR)*inv8
+    L = (G[n:]**a[:n] + H[:n]**b[n:] + U*cL)*inv8
+    R = (G[:n]**a[n:] + H[n:]**b[:n] + U*cR)*inv8
 
     mash(L)
     mash(R)
     x = cache
 
-    G = (G[:n]*x.invert())*(G[n:]*x)
-    H = (H[:n]*x)*(H[n:]*x.invert())
+    G = G[:n]*x.invert() + G[n:]*x
+    H = H[:n]*x + H[n:]*x.invert()
 
     a = a[:n]*x + a[n:]*x.invert()
     b = b[:n]*x.invert() + b[n:]*x
@@ -184,12 +184,12 @@ def prove_A(v,gamma,k,seed=None):
         aR.append(bit-Scalar(1))
 
     alpha = random_scalar()
-    A = (Gi*aL + Hi*aR + G*alpha)*inv8
+    A = (Gi**aL + Hi**aR + G*alpha)*inv8
 
     sL = ScalarVector([random_scalar()]*N)
     sR = ScalarVector([random_scalar()]*N)
     rho = random_scalar()
-    S = (Gi*sL + Hi*sR + G*rho)*inv8
+    S = (Gi**sL + Hi**sR + G*rho)*inv8
 
     # update state
     state.gamma = gamma
