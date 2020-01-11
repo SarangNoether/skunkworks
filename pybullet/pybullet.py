@@ -60,15 +60,15 @@ def inner_product(data):
     n /= 2
     cL = data.a[:n]**data.b[n:]
     cR = data.a[n:]**data.b[:n]
-    data.L.append(data.G[n:]*data.a[:n] + data.H[:n]*data.b[n:] + data.U*cL)
-    data.R.append(data.G[:n]*data.a[n:] + data.H[n:]*data.b[:n] + data.U*cR)
+    data.L.append(data.G[n:]**data.a[:n] + data.H[:n]**data.b[n:] + data.U*cL)
+    data.R.append(data.G[:n]**data.a[n:] + data.H[n:]**data.b[:n] + data.U*cR)
 
     mash(data.L[-1])
     mash(data.R[-1])
     x = cache
 
-    data.G = (data.G[:n]*x.invert())*(data.G[n:]*x)
-    data.H = (data.H[:n]*x)*(data.H[n:]*x.invert())
+    data.G = data.G[:n]*x.invert() + data.G[n:]*x
+    data.H = data.H[:n]*x + data.H[n:]*x.invert()
 
     data.P = data.L[-1]*x**2 + data.P + data.R[-1]*x.invert()**2
 
@@ -80,7 +80,7 @@ def test(a,b,N):
     Gi = PointVector([hash_to_point('pybullet Gi ' + str(i)) for i in range(N)])
     Hi = PointVector([hash_to_point('pybullet Hi ' + str(i)) for i in range(N)])
     U = hash_to_point('pybullet U')
-    P = Gi*a + Hi*b + U*(a**b)
+    P = Gi**a + Hi**b + U*(a**b)
 
     data = InnerProductRound(Gi,Hi,U,a,b,P)
     while True:
