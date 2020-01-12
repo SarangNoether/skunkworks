@@ -6,17 +6,20 @@ import unittest
 # Scalar class
 class TestScalar(unittest.TestCase):
     def test_init(self):
+        # Test construction from hex representations
+        self.assertEqual(Scalar('0000000000000000000000000000000000000000000000000000000000000000'),Scalar(0))
+        self.assertEqual(Scalar('0100000000000000000000000000000000000000000000000000000000000000'),Scalar(1))
+        self.assertEqual(Scalar('ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010'),Scalar(l-1))
+        
         # Test construction using x = 1
         s = Scalar(int(1))
         self.assertEqual(s,Scalar(long(1)))
-        self.assertEqual(s,Scalar('0100000000000000000000000000000000000000000000000000000000000000'))
         self.assertEqual(s.x,int(1))
         self.assertEqual(s.x,long(1))
 
         # Test construction using x = l = 0
         s = Scalar(int(l))
         self.assertEqual(s,Scalar(long(l)))
-        self.assertEqual(s,Scalar('0000000000000000000000000000000000000000000000000000000000000000'))
         self.assertEqual(s.x,int(0))
         self.assertEqual(s.x,long(0))
 
@@ -250,13 +253,8 @@ class TestScalar(unittest.TestCase):
     def test_repr(self):
         # Test known representations
         self.assertEqual(repr(Scalar(0)),'0000000000000000000000000000000000000000000000000000000000000000')
-        self.assertEqual(str(Scalar(0)),'0000000000000000000000000000000000000000000000000000000000000000')
         self.assertEqual(repr(Scalar(1)),'0100000000000000000000000000000000000000000000000000000000000000')
-        self.assertEqual(str(Scalar(1)),'0100000000000000000000000000000000000000000000000000000000000000')
-
-        eight = Scalar('0800000000000000000000000000000000000000000000000000000000000000')
-        inv_8 = Scalar('792fdce229e50661d0da1c7db39dd30700000000000000000000000000000006')
-        self.assertEqual(eight*inv_8,Scalar(1))
+        self.assertEqual(repr(Scalar(l-1)),'ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010')
 
     def test_int(self):
         # Test ingeger reconstruction
@@ -298,9 +296,10 @@ class TestScalar(unittest.TestCase):
 # Point class
 class TestPoint(unittest.TestCase):
     def test_init(self):
-        # Test construction with known hex representations
-        self.assertEqual(Point('5866666666666666666666666666666666666666666666666666666666666666'),G)
+        # Test construction from hex representations
         self.assertEqual(Point('0100000000000000000000000000000000000000000000000000000000000000'),Z)
+        self.assertEqual(Point('5866666666666666666666666666666666666666666666666666666666666666'),G)
+        self.assertEqual(Point('2d4a8929b11fab3025e7df4ba7f3bafcc840416d3d6bfb3d742baf1d5426c041'),hash_to_point(G))
 
         # Test construction of zero with coordinates
         self.assertEqual(Point(0,1),Z)
@@ -387,10 +386,9 @@ class TestPoint(unittest.TestCase):
 
     def test_repr(self):
         # Test known representations
-        self.assertEqual(repr(G),'5866666666666666666666666666666666666666666666666666666666666666')
-        self.assertEqual(str(G),'5866666666666666666666666666666666666666666666666666666666666666')
         self.assertEqual(repr(Z),'0100000000000000000000000000000000000000000000000000000000000000')
-        self.assertEqual(str(Z),'0100000000000000000000000000000000000000000000000000000000000000')
+        self.assertEqual(repr(G),'5866666666666666666666666666666666666666666666666666666666666666')
+        self.assertEqual(repr(hash_to_point(G)),'2d4a8929b11fab3025e7df4ba7f3bafcc840416d3d6bfb3d742baf1d5426c041')
 
     def test_neg(self):
         # Test negation
@@ -569,9 +567,7 @@ class TestPointVector(unittest.TestCase):
     def test_repr(self):
         # Test known representation
         self.assertEqual(repr(PointVector([Z,G])),'[0100000000000000000000000000000000000000000000000000000000000000, 5866666666666666666666666666666666666666666666666666666666666666]')
-        self.assertEqual(str(PointVector([Z,G])),'[0100000000000000000000000000000000000000000000000000000000000000, 5866666666666666666666666666666666666666666666666666666666666666]')
         self.assertEqual(repr(PointVector()),'[]')
-        self.assertEqual(str(PointVector()),'[]')
 
     def test_neg(self):
         # Test negation
@@ -752,9 +748,7 @@ class TestScalarVector(unittest.TestCase):
     def test_repr(self):
         # Test known representation
         self.assertEqual(repr(ScalarVector([Scalar(0),Scalar(1)])),'[0000000000000000000000000000000000000000000000000000000000000000, 0100000000000000000000000000000000000000000000000000000000000000]')
-        self.assertEqual(str(ScalarVector([Scalar(0),Scalar(1)])),'[0000000000000000000000000000000000000000000000000000000000000000, 0100000000000000000000000000000000000000000000000000000000000000]')
         self.assertEqual(repr(ScalarVector()),'[]')
-        self.assertEqual(str(ScalarVector()),'[]')
 
     def test_invert(self):
         # Test nonzero inversion

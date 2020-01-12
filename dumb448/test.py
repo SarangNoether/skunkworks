@@ -6,17 +6,20 @@ import unittest
 # Scalar class
 class TestScalar(unittest.TestCase):
     def test_init(self):
+        # Test construction from hex representations
+        self.assertEqual(Scalar('000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'),Scalar(0))
+        self.assertEqual(Scalar('010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'),Scalar(1))
+        self.assertEqual(Scalar('f24458ab92c27823558fc58d72c26c219036d6ae49db4ec4e923ca7cffffffffffffffffffffffffffffffffffffffffffffffffffffff3f00'),Scalar(l-1))
+
         # Test construction using x = 1
         s = Scalar(int(1))
         self.assertEqual(s,Scalar(long(1)))
-        self.assertEqual(s,Scalar('010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'))
         self.assertEqual(s.x,int(1))
         self.assertEqual(s.x,long(1))
 
         # Test construction using x = l = 0
         s = Scalar(int(l))
         self.assertEqual(s,Scalar(long(l)))
-        self.assertEqual(s,Scalar('000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'))
         self.assertEqual(s.x,int(0))
         self.assertEqual(s.x,long(0))
 
@@ -250,13 +253,8 @@ class TestScalar(unittest.TestCase):
     def test_repr(self):
         # Test known representations
         self.assertEqual(repr(Scalar(0)),'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000')
-        self.assertEqual(str(Scalar(0)),'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000')
         self.assertEqual(repr(Scalar(1)),'010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000')
-        self.assertEqual(str(Scalar(1)),'010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000')
-
-        eight = Scalar('080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000')
-        inv_8 = Scalar('182b17ab9b792b3695799b9887f9e3141ae2450d0e49b11a7256feadffffffffffffffffffffffffffffffffffffffffffffffffffffff2700')
-        self.assertEqual(eight*inv_8,Scalar(1))
+        self.assertEqual(repr(Scalar(l-1)),'f24458ab92c27823558fc58d72c26c219036d6ae49db4ec4e923ca7cffffffffffffffffffffffffffffffffffffffffffffffffffffff3f00')
 
     def test_int(self):
         # Test ingeger reconstruction
@@ -298,9 +296,10 @@ class TestScalar(unittest.TestCase):
 # Point class
 class TestPoint(unittest.TestCase):
     def test_init(self):
-        # Test construction with known hex representations
-        self.assertEqual(Point('14fa30f25b790898adc8d74e2c13bdfdc4397ce61cffd33ad7c2a0051e9c78874098a36c7373ea4b62c7c9563720768824bcb66e71463f6900'),G)
+        # Test construction from hex representations
         self.assertEqual(Point('010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'),Z)
+        self.assertEqual(Point('14fa30f25b790898adc8d74e2c13bdfdc4397ce61cffd33ad7c2a0051e9c78874098a36c7373ea4b62c7c9563720768824bcb66e71463f6900'),G)
+        self.assertEqual(Point('64e7daaa2444c64ee7c4e059ce927b5e1ae1852c9acaaa64f687ed440d4b8f1f551c97c0cce91027e6aa2d947ab1e426bf69900723e479cb00'),hash_to_point(G))
 
         # Test construction of zero with coordinates
         self.assertEqual(Point(0,1),Z)
@@ -387,10 +386,9 @@ class TestPoint(unittest.TestCase):
 
     def test_repr(self):
         # Test known representations
-        self.assertEqual(repr(G),'14fa30f25b790898adc8d74e2c13bdfdc4397ce61cffd33ad7c2a0051e9c78874098a36c7373ea4b62c7c9563720768824bcb66e71463f6900')
-        self.assertEqual(str(G),'14fa30f25b790898adc8d74e2c13bdfdc4397ce61cffd33ad7c2a0051e9c78874098a36c7373ea4b62c7c9563720768824bcb66e71463f6900')
         self.assertEqual(repr(Z),'010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000')
-        self.assertEqual(str(Z),'010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000')
+        self.assertEqual(repr(G),'14fa30f25b790898adc8d74e2c13bdfdc4397ce61cffd33ad7c2a0051e9c78874098a36c7373ea4b62c7c9563720768824bcb66e71463f6900')
+        self.assertEqual(repr(hash_to_point(G)),'64e7daaa2444c64ee7c4e059ce927b5e1ae1852c9acaaa64f687ed440d4b8f1f551c97c0cce91027e6aa2d947ab1e426bf69900723e479cb00')
 
     def test_neg(self):
         # Test negation
