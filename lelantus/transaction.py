@@ -135,9 +135,11 @@ class SpendTransaction:
         spend_states = []
         self.Q = [] # input coin public keys
         self.spend_proofs = []
+        offsets = [] # for use in Fiat-Shamir challenge
         for i in range(len(q)):
             self.Q.append(G*q[i])
             offset = groth.comm(hash_to_scalar(self.Q[-1]),Scalar(0),Scalar(0))
+            offsets.append(offset)
             M = [C-offset for C in C_list] # one is a commitment to zero
 
             spend_proof,spend_state = groth.prove_initial(M,l[i],v_in[i],r_in[i],n,m)
@@ -145,7 +147,7 @@ class SpendTransaction:
             spend_states.append(spend_state)
 
         # Compute aggregate Fiat-Shamir challenge
-        x = groth.challenge(C_list,self.spend_proofs)
+        x = groth.challenge(C_list+offsets,self.spend_proofs)
 
         # Complete spend proofs
         self.spend_sigs = []
@@ -208,11 +210,13 @@ class SpendTransaction:
             signature.verify(repr(self.spend_proofs[i]),self.Q[i],self.spend_sigs[i])
 
         # Verify the spend proofs
-        x = groth.challenge(self.C_list,self.spend_proofs)
+        offsets = [] # for use in Fiat-Shamir challenge
         for i in range(len(self.spend_proofs)):
             s = hash_to_scalar(self.Q[i])
-            offset = groth.comm(s,Scalar(0),Scalar(0))
-            M = [C-offset for C in self.C_list]
+            offsets.append(groth.comm(s,Scalar(0),Scalar(0)))
+        x = groth.challenge(self.C_list+offsets,self.spend_proofs)
+        for i in range(len(self.spend_proofs)):
+            M = [C-offsets[i] for C in self.C_list]
             groth.verify(M,self.spend_proofs[i],n,m,x)
 
         # Verify the aggregate range proof
