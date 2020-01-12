@@ -5,15 +5,6 @@ from dumb25519 import *
 import groth
 from random import randint
 
-# Compute the digest of a list of points
-def digest(points,scalars):
-    if not len(points) == len(scalars):
-        raise IndexError('Digest requires the same number of points and exponents!')
-    R = Z
-    for i in range(len(points)):
-        R += points[i]*scalars[i]
-    return R
-
 # Total of N = M*T = (n_M**m_M)*(n_T**m_T) commitments
 n_M = 2
 m_M = 2
@@ -61,8 +52,8 @@ for i in range(M):
 # Subset digests
 D = []
 for i in range(T):
-    D.append(digest(C[i*M:(i+1)*M],x))
-digest_d = digest(d,x)
+    D.append(multiexp(x,C[i*M:(i+1)*M]))
+digest_d = multiexp(x,d)
 
 # Layer-2 proof
 mask_v = Scalar(0)
