@@ -69,14 +69,14 @@ Like this work, \cite{lelantus} is a transaction protocol also based on \cite{gr
 
 
 \subsection{Our contribution}
-We produce two instantiations of a linkable ring signature, which we call Triptych.
+We produce a family of linkable ring signatures, which we call Triptych.
 The constructions are a linkable generalization of Groth's one-of-many commitment-to-zero proving system \cite{groth}, with optimizations from Bootle \cite{bootle} applied for improvements to proof size and verification complexity.
-In one version of Triptych, the prover shows that it knows the opening of a commitment to zero within a commitment list, and also that it has constructed a linking tag using the same opening, enabling linkability.
+In the simplest version of Triptych, the prover shows that it knows the opening of a commitment to zero within a commitment set, and also that it has constructed a linking tag using the same opening, producing a linkable ring signature construction.
 We then modify Groth's ring signature definitions to include linkability and a related property, non-frameability.
 
-In the second version of Triptych, we further generalize to include a parallel list of commitments.
-Here, the prover proceeds as before to show its knowledge of an opening to a commitment in one list, as well as the construction of the linking tag.
-However, the proof also shows that the prover knows an opening of a commitment at the same position in the second commitment list.
+In an extension of Triptych, we include multiple independent sets of commitments.
+Here, the prover proceeds as before to show its knowledge of an opening to a commitment in one set, as well as the construction of the linking tag.
+However, the proof also shows that the prover knows an opening of a commitment at the same position in all other sets.
 This construction has immediate application; in some signer-ambiguous confidential transaction protocols, transaction inputs are commitments to zero, for which the signer shows it knows the opening.
 Each commitment comes equipped with another commitment to the amount of the input; by offsetting these commitments homomorphically and carefully choosing commitment randomness, the prover can show that a particular transaction balances.
 
@@ -450,46 +450,47 @@ However, the adversary did not query $\text{CorruptOracle}$ with $X$, meaning it
 
 
 \section{Protocol: parallel linkable one-of-many commitment}
-In this section, we describe a modification of the sigma protocol for $\mathcal{R}_{\text{link}}$ that permits us to prove knowledge of multiple commitments in separate sets at the same index position, while retaining the linking property in the first commitment set only.
+In this section, we describe a modification of the sigma protocol for $\mathcal{R}_{\text{link}}$ that permits us to prove knowledge of multiple commitments in $d > 1$ separate sets at the same index position, while retaining the linking property in the first commitment set only.
+This forms a version of Triptych with the same functionality as the $d$-linkable ring signature construction in \cite{clsag}, although the precise security model is a bit different.
 We later show how to apply such a construction to a signer-ambiguous transaction protocol that can demonstrate balance preservation.
 
-We wish to produce a sigma protocol for the following relation:
-$$\mathcal{R}_{\text{par}} = \left\{ \{M_i\}_{i=0}^{N-1} \subset \G, \{P_i\}_{i=0}^{N-1} \subset \G, J \in \G ; (l \in \mathbb{Z},r \in \F,s \in \F) : M_l = rG \text{ and } P_l = sG \text{ and } U = rJ \right\}$$
+We wish to produce a sigma protocol for the following relation, for some given vector dimension $d > 1$.
+$$\mathcal{R}_{\text{par}} = \left\{ \{M_{i,\alpha}\}_{i,\alpha=0}^{N-1,d-1} \subset \G^d, J \in G ; \left(l, \{r_\alpha\}_{\alpha=0}^{d-1}\right) : \{M_{l,\alpha} = r_\alpha G\}_{\alpha=0}^{d-1} \text{ and } U = r_0 J \right\}$$
 This requires only minor modifications to the protocol for $\mathcal{R}_{\text{link}}$, so we document only the modified proof elements constructed and verified in Figure \ref{fig:par}.
 All other proof elements are generated and verified identically.
 
 \begin{figure}[htbp]
 \centering
 \fbox{\begin{minipage}{0.95\textwidth}
-$\underline{\mathcal{P}_{\text{par}}(\{M_i\},\{P_i\},J;(l,r,s)):}$
+$\underline{\mathcal{P}_{\text{par}}\left(\{M_{i,\alpha}\},J;\left(l,\{r_\alpha\}\right)\right):}$
 \begin{itemize}
-\item Define $K \equiv sJ$.
-\item Define $\mu \equiv \hs(\{M_i\},\{P_i\},J,K)$.
-\item Define $\{X_j\}_{j=0}^{m-1} \subset \G$ such that: $$X_j \equiv \sumk p_{k,j}(M_k + \mu P_k) + \rho_jG$$
-\item Define $\{Y_j\}_{j=0}^{m-1} \subset \G$ such that: $$Y_j \equiv (U + \mu K)\sumk p_{k,j} + \rho_jG$$
+\item Define $K_\alpha \equiv r_\alpha J$ for $\alpha \in (0,d)$.
+\item Define $\mu_\alpha \equiv \hs\left(\alpha,\{M_{i,\alpha}\},J,\{K_\alpha\}\right)$ for $\alpha \in (0,d)$.
+\item Define $\{X_j\}_{j=0}^{m-1} \subset \G$ such that: $$X_j \equiv \sumk p_{k,j}\left(M_{k,0} + \sum_{\alpha=1}^{d-1} \mu_\alpha M_{k,\alpha}\right) + \rho_jG$$
+\item Define $\{Y_j\}_{j=0}^{m-1} \subset \G$ such that: $$Y_j \equiv \left(U + \sum_{\alpha=1}^{d-1} \mu_\alpha K_\alpha\right)\sumk p_{k,j} + \rho_jG$$
 \end{itemize}
 
 $\underline{\mathcal{P} \to \mathcal{V}:}$ \\
-$K,\{X_j\},\{Y_j\}$ \\
+$\{K_\alpha\},\{X_j\},\{Y_j\}$ \\
 
 $\underline{\mathcal{V} \to \mathcal{P}:}$ \\
 $\xi \in \{0,1\}^*$ \\
 
 $\underline{\mathcal{P}(\xi):}$
 \begin{itemize}
-\item Define $z \equiv (r + \mu s)\xi^m - \sumj \rho_j\xi^j$.
+\item Define $z \equiv \left(r_0 + \sum_{\alpha=1}^{d-1} \mu_\alpha r_\alpha\right)\xi^m - \sumj \rho_j\xi^j$.
 \end{itemize}
 
 $\underline{\mathcal{P} \to \mathcal{V}:}$ \\
 $z$ \\
 
-$\underline{\mathcal{V}_{\text{par}}(\{M_i\},\{P_i\},J):}$
+$\underline{\mathcal{V}_{\text{par}}(\{M_{i,\alpha}\},J):}$
 \begin{itemize}
-\item Define $\mu \equiv \hs(\{M_i\},\{P_i\},J,K)$.
+\item Define $\mu_\alpha \equiv \hs\left(\alpha,\{M_{i,\alpha}\},J,\{K_\alpha\}\right)$ for $\alpha \in (0,d)$.
 \item Accept if and only if:
 \begin{eqnarray*}
-\sumk (M_k + \mu P_k) \left( \prod_{j=0}^{m-1} f_{j,k_j} \right) - \sumj \xi^jX_j - zG &=& 0 \\
-(U + \mu K)\sumk \left( \prod_{j=0}^{m-1} f_{j,k_j} \right) - \sumj \xi^jY_j - zJ &=& 0
+\sumk \left(M_{k,0} + \sum_{\alpha=1}^{d-1} \mu_\alpha M_{k,\alpha}\right) \left( \prod_{j=0}^{m-1} f_{j,k_j} \right) - \sumj \xi^jX_j - zG &=& 0 \\
+\left(U + \sum_{\alpha=1}^{d-1} \mu_\alpha K_\alpha\right)\sumk \left( \prod_{j=0}^{m-1} f_{j,k_j} \right) - \sumj \xi^jY_j - zJ &=& 0
 \end{eqnarray*}
 \end{itemize}
 \end{minipage}}
@@ -502,24 +503,24 @@ The protocol in Figure \ref{fig:par} is perfectly complete, special honest-verif
 \end{theorem}
 
 \begin{proof}
-In the random oracle model, extraction of a witness of the form $r + \mu s$ implies knowledge of both $r$ and $s$ such that $rG = M_l$ and $sG = P_l$, similarly to the key-aggregation arguments in \cite{musig}.
-The same extraction shows that $(r + \mu s)J = U + \mu K$, which implies in particular that $rJ = U$, as required.
+In the random oracle model, extraction of a witness of the form $r_0 + \sum_{\alpha} \mu_\alpha r_\alpha$ implies knowledge of all $\{r_\alpha\}$ such that $r_\alpha G = M_{l,\alpha}$, similarly to the key-aggregation arguments in \cite{musig}.
+The same extraction shows that $\left(r_0 + \sum_{\alpha} \mu_\alpha r_\alpha\right)J = U + \sum_{\alpha} \mu_\alpha K_\alpha$, which implies in particular that $r_0J = U$, as required.
 
 The rest of the proof follows with only trivial modifications from the proof for $\mathcal{R}_{\text{link}}$.
 \end{proof}
 
 
 \section{Application: signer-ambiguous transaction protocol}
-The parallel construction described in Figure \ref{fig:par} can be used in a signer-ambiguous transaction protocol.
+The parallel construction described in Figure \ref{fig:par} can be used with $d = 2$ in a signer-ambiguous transaction protocol.
 
 Suppose a user wishes to generate a transaction consuming $W$ previously-generated outputs and generating $T$ fresh outputs.
-The user shuffles the consumed outputs within a larger list of $N$ outputs $\{M_k\}_{k=0}^{N-1}$, such that there exist indices $\{l_u\}_{u=0}^{W-1}$ where each $M_{l_u} = r_u$ for some known private key $r_u$.
-Further, assume each $M_{l_u}$ comes equipped with an amount commitment of the form $P_{l_u} \equiv \com(a_u,s_u)$ for amount $a_u$ and mask $s_u$.
-(All other $M_k$ also come equipped with a corresponding $P_k$, but the structure of these points is not relevant here.)
+The user shuffles the consumed outputs within a larger list of $N$ outputs $\{M_{k,0}\}_{k=0}^{N-1}$, such that there exist indices $\{l_u\}_{u=0}^{W-1}$ where each $M_{l_u,0} = r_u$ for some known private key $r_u$.
+Further, assume each $M_{l_u,0}$ comes equipped with an amount commitment of the form $M_{l_u,1} \equiv \com(a_u,s_u)$ for amount $a_u$ and mask $s_u$.
+(All other $M_{k,0}$ also come equipped with a corresponding $M_{k,1}$, but the structure of these points is not relevant here.)
 
 The user generates $W$ auxiliary commitments $P'_u \equiv \com(a_u,s'_u)$ to the same amounts, but with different masks $\{s'_u\}$ chosen uniformly at random from $\F$.
 Then, the user generates $W$ spend proofs, each using the following prover inputs for $u \in [0,W)$:
-$$\mathcal{P}_{par}(\{M_i\},\{P_i-P'_u\},r_u^{-1}U;(l_u,r_u,s_u-s'_u))$$
+$$\mathcal{P}_{par}(\{M_{i,\alpha}\},r_u^{-1}U;(l_u,\{r_u,s_u-s'_u\}))$$
 
 For $j \in [0,T)$, the user generates a fresh output of the form $Q_j \equiv \com(b_j,t_j)$ for amount $b_j$ and mask $t_j$.
 The masks are chosen such that for $j \in [1,T)$, we have $t_j$ chosen uniformly at random from $\F$.
@@ -537,9 +538,9 @@ However, it is challenging to directly compare these protocols' efficiency.
 Omniring includes all transaction input signatures, output range proofs, and balance within a single proof structure; however, it is not possible to verify a batch of proofs more efficiently by combining common generators.
 While an early version of RingCT 3.0 used separate input, range, and balance proofs, the most recent version merges all input and balance proofs together but outsources the range proofs to an efficient construction like \cite{bulletproofs}; this comes at the cost of requiring that the number of inputs be a power of two or otherwise carefully padded (affecting verification time).
 Therefore, for the purpose of comparison we modify slightly the earlier version of RingCT 3.0 with a soundness fix applied from the updated version, ignoring the size and verification cost of non-proof elements.
-Another more direct comparison is to $2$-CLSAG, a linear-sized linkable ring signature construction \cite{clsag}.
+Another more direct comparison is to CLSAG, a linear-sized linkable ring signature construction \cite{clsag}.
 
-We now show size and verification comparisons of the parallel instantiation of Triptych, the earlier (modified) version of RingCT 3.0, and $2$-CLSAG.
+We now show size and verification comparisons of the parallel instantiation of Triptych with $d = 2$, the earlier (modified) version of RingCT 3.0, and $2$-CLSAG.
 For verification scaling, we also account for the use of batching in Triptych and RingCT 3.0, where generators common to multiple proofs are used only once in verification.
 Further, since verification in both of these constructions reduces to checking whether several multiscalar multiplications are zero, we may apply random weighting such that verifying a batch of multiple proofs reduces to a single multiscalar multiplication.
 The use of efficient multiscalar multiplication algorithms like \cite{straus,pippenger} means that an $n$-multiscalar multiplication evaluates as $O(n/\log n)$.
