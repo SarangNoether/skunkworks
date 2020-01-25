@@ -1,5 +1,4 @@
-MoJoin: semi-trusted merged transactions
-----------------------------------------
+# MoJoin: semi-trusted merged transactions
 
 This document describes a method for merging transaction inputs and outputs from multiple parties into a single transaction. While it requires certain trust in a dealer, the resulting transaction has useful properties:
 - it is indistinguishable from a non-MoJoin transaction
@@ -10,51 +9,57 @@ This document describes a method for merging transaction inputs and outputs from
 Such a construction is useful because it breaks an important heuristic: common control. Under this heuristic, an adversary can reasonably assume that in a transaction spending multiple inputs, all such inputs are controlled by a single entity. While ring signatures obscure the identity of the spent outputs, other heuristics may provide the adversary an advantage in this determination. MoJoin trades this heuristic for a particular level of trust in a dealer, who may or may not also be a player in the transaction. Specifically, the dealer learns which subsets of input rings are linked to which subsets of outputs. However, we stress that the dealer does not learn which inputs in a player's rings are actually spent. Therefore, the ability to link inputs is shifted from any observer (in the current transaction model) to a single entity of the player's choice. It remains an open question if it is possible to remove this dealer trust.
 
 
-SETUP
+## Setup
+
 Suppose that Alice, Bob, and Charlie wish to perform a MoJoin operation. They do not trust each other, but they each have partial trust in Dave, a dealer. (Note that Dave could also be a player in the protocol.) Each player wishes to spend a certain number of inputs and generate a certain number of outputs. Crucially, each subtransaction must balance, which implies that the resulting merged transaction will also balance.
 
 
-ROUND 0: INDEXING
-A,B,C -> D: number of outputs
+## ROUND 0: indexing
+
+*A,B,C -> D: number of outputs*
     Each player sends Dave the number of outputs they wish to produce.
 
-D -> A,B,C: output indices
-    Let N_A, N_B, and N_C be the number of outputs reported by the players. Dave shuffles the list of numbers {1,2,...,N_A+N_B+N_C}. He sends Alice the first N_A numbers from the shuffle, Bob the next N_B numbers, and Charlie the last N_C numbers. Without loss of generality, assume that Alice receives the first index.
+*D -> A,B,C: output indices*
+    Let `N_A`, `N_B`, and `N_C` be the number of outputs reported by the players. Dave shuffles the list of numbers `{1,2,...,N_A+N_B+N_C}`. He sends Alice the first `N_A` numbers from the shuffle, Bob the next `N_B` numbers, and Charlie the last `N_C` numbers. Without loss of generality, assume that Alice receives the first index.
 
 
-ROUND 1: COMMITMENTS AND BULLETPROOFS-A
-A,B,C -> D: output commitments, public keys, auxiliary data, and Bulletproofs-A proofs
+## ROUND 1: commitments and Bulletproofs-A
+
+*A,B,C -> D: output commitments, public keys, auxiliary data, and Bulletproofs-A proofs*
     Each player uses the output indices from ROUND 0 to generate a commitment for each output. They also generate one-time output public keys, the associated transaction keys, and the associated encrypted amounts. Separate transaction keys are used for each output, regardless of whether destination addresses are standard addresses or subaddresses. They also generate stage-A Bulletproof partial proofs for all outputs. They send this data to Dave.
 
-D -> A,B,C: Bulletproofs A/B challenge
+*D -> A,B,C: Bulletproofs A/B challenge*
     Dave computes the Bulletproofs A/B challenge and returns it to each player.
 
 
-ROUND 1A: MASK SUMS
-B,C -> D: mask sums
+## ROUND 1A: mask sums
+
+*B,C -> D: mask sums*
     Each player EXCEPT for Alice (who received the first index in ROUND 0) generates pseudo-output commitments for each spent input, using random masks. They compute the sum of all pseudo-output masks and all output masks and send this single sum to Dave.
 
-D -> A: total mask sum
+*D -> A: total mask sum*
     Dave adds all the mask sums received from all other players and sends this total mask sum to Alice. Alice generates pseudo-output commitments for each spent input; she uses random masks for all such commitments except one, which she computes such that the sum of all her pseudo-output masks, all her output masks, and the total mask sum is zero.
 
 
-ROUND 2: BULLETPROOFS-B
-A,B,C -> D: Bulletproofs-B proofs
+## ROUND 2: Bulletproofs-B
+
+*A,B,C -> D: Bulletproofs-B proofs*
     Each player uses the challenge received in ROUND 1 to generate stage-B Bulletproofs partial proofs for all outputs. They send this data, along with all pseudo-output commitments computed in ROUNDS 1 and 1A, to Dave.
 
-D -> A,B,C: Bulletproofs B/C challenge
+*D -> A,B,C: Bulletproofs B/C challenge*
     Dave computes the Bulletproofs B/C challenge and returns it to each player.
 
 
-ROUND 3: SIGNATURES AND BULLETPROOFS-C
-A,B,C -> D: MLSAGs and Bulletproofs-C proofs
+## ROUND 3: signatures and Bulletproofs-C
+
+*A,B,C -> D: MLSAGs and Bulletproofs-C proofs*
     Each player uses the challenge received in ROUND 2 to generate stage-C Bulletproofs partial proofs for all outputs. They also generate MLSAG signatures for each spent input. They send this data to Dave.
 
-D -> A,B,C: final transaction
+*D -> A,B,C: final transaction*
     Dave completes the aggregation of the Bulletproofs into a single proof. He verifies the Bulletproof to confirm it contains valid proofs for all outputs. He verifies all MLSAG signatures. He verifies that the sum of all pseudo-output masks and output masks is zero. He returns the final transaction data to all players. Either Dave or any other player may broadcast the resulting transaction to the network.
 
 
-SECURITY AND RISK
+## Security and risk
 At the end of the protocol, each player receives the final transaction. A player knows its own signature and output data; however, if there are at least three non-colluding players, it will not know the mapping between inputs and outputs, nor can it use sums of subsets of commitments (pseudo-output and output) to determine this, since all commitment masks (except for one) are chosen uniformly at random or are computed using a Diffie-Hellman exchange known only to the player and the eventual recipient.
 
 An observer cannot distinguish a valid MoJoin transaction from a single-party transaction. All input MLSAG signatures are computed as normal, and the Bulletproofs multiparty computation protocol ensures that the range proof is verified precisely as in the single-party aggregated case.
