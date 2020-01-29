@@ -6,7 +6,7 @@ inv8 = Scalar(8).invert()
 
 # Proof structure
 class Bulletproof:
-    def __init__(self,V,A,S,T1,T2,taux,mu,L,R,a,b,t):
+    def __init__(self,V,A,S,T1,T2,taux,mu,L,R,a,b,t,seed):
         self.V = V
         self.A = A
         self.S = S
@@ -19,6 +19,7 @@ class Bulletproof:
         self.a = a
         self.b = b
         self.t = t
+        self.seed = seed # NOTE: included here for convenience, but not public data
 
 # Data for a round of the inner product argument
 class InnerProductRound:
@@ -123,9 +124,11 @@ def inner_product(data):
 # INPUTS
 #   data: list of value/mask pairs (Scalars)
 #   N: number of bits in range (int)
+#   seed: seed for auxiliary data (hashable, optional)
+#   aux: auxiliary data to hide (Scalar, optional)
 # OUTPUTS
 #   Bulletproof
-def prove(data,N):
+def prove(data,N,seed=None,aux=None):
     tr = transcript.Transcript('Bulletproof')
     M = len(data)
 
@@ -148,12 +151,12 @@ def prove(data,N):
     for bit in aL.scalars:
         aR.append(bit-Scalar(1))
 
-    alpha = random_scalar()
+    alpha = random_scalar() if seed is None else hash_to_scalar(seed,V,'alpha') + aux
     A = (Gi**aL + Hi**aR + G*alpha)*inv8
 
     sL = ScalarVector([random_scalar()]*(M*N))
     sR = ScalarVector([random_scalar()]*(M*N))
-    rho = random_scalar()
+    rho = random_scalar() if seed is None else hash_to_scalar(seed,V,'rho')
     S = (Gi**sL + Hi**sR + G*rho)*inv8
 
     # get challenges
@@ -200,7 +203,7 @@ def prove(data,N):
         gamma = data[j-1][1]
         taux += z**(1+j)*gamma
     mu = x*rho+alpha
-    
+
     l = l0 + l1*x
     r = r0 + r1*x
     t = l**r
@@ -220,7 +223,7 @@ def prove(data,N):
 
         # we have reached the end of the recursion
         if data.done:
-            return Bulletproof(V,A,S,T1,T2,taux,mu,data.L,data.R,data.a,data.b,t)
+            return Bulletproof(V,A,S,T1,T2,taux,mu,data.L,data.R,data.a,data.b,t,seed)
 
 # Verify a batch of multi-output proofs
 #
@@ -228,7 +231,7 @@ def prove(data,N):
 #   proofs: list of proofs (Bulletproofs)
 #   N: number of bits in range (int)
 # OUTPUTS
-#   True if all proofs are valid
+#   auxiliary data list if all proofs are valid
 def verify(proofs,N):
     # determine the length of the longest proof
     max_MN = 2**max([len(proof.L) for proof in proofs])
@@ -250,6 +253,9 @@ def verify(proofs,N):
     scalars = ScalarVector([]) # for final check
     points = PointVector([]) # for final check
 
+    # store auxiliary data
+    aux = []
+
     # run through each proof
     for proof in proofs:
         tr = transcript.Transcript('Bulletproof')
@@ -266,6 +272,7 @@ def verify(proofs,N):
         a = proof.a
         b = proof.b
         t = proof.t
+        seed = proof.seed
 
         # get size information
         M = 2**len(L)/N
@@ -299,6 +306,12 @@ def verify(proofs,N):
         x_ip = tr.challenge()
         if x_ip == Scalar(0):
             raise ArithmeticError
+
+        # recover auxiliary data if present
+        if seed is not None:
+            aux.append(mu - x*hash_to_scalar(seed,V,'rho') - hash_to_scalar(seed,V,'alpha'))
+        else:
+            aux.append(None)
 
         y0 += taux*weight_y
         
@@ -375,4 +388,4 @@ def verify(proofs,N):
     if not dumb25519.multiexp(scalars,points) == Z:
         raise ArithmeticError('Bad verification!')
 
-    return True
+    return aux
