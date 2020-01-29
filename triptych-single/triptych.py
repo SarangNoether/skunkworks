@@ -23,6 +23,7 @@ class Proof:
         self.zA = None
         self.zC = None
         self.z = None
+        self.seed = None
 
     def __repr__(self):
         temp = '<TriptychProof> '
@@ -96,9 +97,12 @@ def convolve(x,y,size=None):
 #  r: Pedersen blinder for M[l]
 #  s: Pedersen blinder for P[l]
 #  m: dimension such that len(M) = len(P) == 2**m
+#  seed: seed for data hiding (optional)
+#  aux1: auxiliary data to store (optional)
+#  aux2: auxiliary data to store (optional)
 # RETURNS
 #  proof structure
-def prove(M,P,l,r,s,m):
+def prove(M,P,l,r,s,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
     n = 2 # binary decomposition
     tr = transcript.Transcript('Triptych single-input')
 
@@ -116,10 +120,10 @@ def prove(M,P,l,r,s,m):
     K = s*J
 
     # Prepare matrices and corresponding blinders
-    rA = random_scalar()
-    rB = random_scalar()
-    rC = random_scalar()
-    rD = random_scalar()
+    rA = random_scalar() if seed is None else hash_to_scalar(seed,M,P,J,K,'rA') + aux1
+    rB = random_scalar() if seed is None else hash_to_scalar(seed,M,P,J,K,'rB')
+    rC = random_scalar() if seed is None else hash_to_scalar(seed,M,P,J,K,'rC')
+    rD = random_scalar() if seed is None else hash_to_scalar(seed,M,P,J,K,'rD') + aux2
 
     # Commit to zero-sum blinders
     a = [[random_scalar() for _ in range(n)] for _ in range(m)]
@@ -212,6 +216,7 @@ def prove(M,P,l,r,s,m):
     proof.zA = zA
     proof.zC = zC
     proof.z = z
+    proof.seed = seed
 
     return proof
 
@@ -223,7 +228,7 @@ def prove(M,P,l,r,s,m):
 #  proof: proof structure
 #  m: dimension such that len(M) = len(P) == 2**m
 # RETURNS
-#  True if the proof is valid
+#  auxiliary data if the proof is valid
 def verify(M,P,proof,m):
     n = 2
     N = n**m
@@ -241,6 +246,7 @@ def verify(M,P,proof,m):
     zA = proof.zA
     zC = proof.zC
     z = proof.z
+    seed = proof.seed
 
     # Fiat-Shamir transcript challenge
     mu = hash_to_scalar(M,P,J,K,A,B,C,D)
@@ -255,6 +261,11 @@ def verify(M,P,proof,m):
     tr.update(X)
     tr.update(Y)
     x = tr.challenge()
+
+    # Recover hidden data if present
+    if seed is not None:
+        aux1 = zA - (hash_to_scalar(seed,M,P,J,K,'rB')*x + hash_to_scalar(seed,M,P,J,K,'rA'))
+        aux2 = zC - (hash_to_scalar(seed,M,P,J,K,'rC')*x + hash_to_scalar(seed,M,P,J,K,'rD'))
 
     # A/B check
     for j in range(m):
@@ -294,4 +305,4 @@ def verify(M,P,proof,m):
     if not RY == dumb25519.Z:
         raise ArithmeticError('Failed linking check!')
 
-    return True
+    return aux1,aux2
