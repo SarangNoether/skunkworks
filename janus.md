@@ -20,6 +20,8 @@ Note the mismatched indices in the output public key.
 
 When recovering the output, the recipient computes `P - H(a*R)*G == B_j` and assumes the output is directed to subaddress `j`. If the recipient acknowledges receipt of the transaction, the adversary knows that subaddresses `i` and `j` are linked.
 
+Note that the attack can also attempt to link a subaddress to its corresponding master address.
+
 
 ## Mitigation
 
@@ -39,3 +41,10 @@ To see why the mitigation detects a Janus output:
 `R - b_j*R' == r*B_i - b_j*(r*G) == r*(B_i - B_j) != 0` (for `i != j`)
 
 In order for the adversary to fool the mitigation check, it must provide `R'` such that `b_jR' == b_i*G`, which it cannot do since subaddress private keys are uniformly and independently distributed and unknown to the adversary.
+
+
+## Considerations
+
+This mitigation requires the addition of a single group element `R' = r*G` for each transaction private key `r` used in a transaction. This point is redundant in the case where no subaddresses appear as recipients, since it has the same construction as a standard-address transaction public key. The presence or absence of additional transaction public keys is already a signal of the presence of subaddress recipients, which is a separate concern.
+
+No additional computational complexity is present when scanning transactions for controlled outputs. For each identified output requiring the mitigation, the complexity of the check is minimal. This check can also be batched across multiple transactions if desired, in order to increase efficiency when computing many checks at once.
