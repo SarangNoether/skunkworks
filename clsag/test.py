@@ -15,7 +15,7 @@ class TestValidSignatures(unittest.TestCase):
         M = 'Test message'
         
         sig = sign(M,p,P,z,C)
-        verify(M,P,C,sig)
+        self.assertEqual(verify(M,P,C,sig),None)
 
     def test_n_2_l_0(self):
         p = random_scalar()
@@ -23,9 +23,13 @@ class TestValidSignatures(unittest.TestCase):
         z = random_scalar()
         C = [G*z,random_point()]
         M = 'Test message'
+        seed = random_scalar()
         
+        sig = sign(M,p,P,z,C,seed)
+        self.assertEqual(verify(M,P,C,sig,seed),0)
+
         sig = sign(M,p,P,z,C)
-        verify(M,P,C,sig)
+        self.assertEqual(verify(M,P,C,sig),None)
 
     def test_n_2_l_1(self):
         p = random_scalar()
@@ -33,9 +37,13 @@ class TestValidSignatures(unittest.TestCase):
         z = random_scalar()
         C = [random_point(),G*z]
         M = 'Test message'
+        seed = random_scalar()
         
+        sig = sign(M,p,P,z,C,seed)
+        self.assertEqual(verify(M,P,C,sig,seed),1)
+
         sig = sign(M,p,P,z,C)
-        verify(M,P,C,sig)
+        self.assertEqual(verify(M,P,C,sig),None)
 
 class TestBadPoints(unittest.TestCase):
     def test_n_1_bad_P(self):
