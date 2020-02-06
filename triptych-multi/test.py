@@ -29,6 +29,11 @@ class TestValidProofs(unittest.TestCase):
                     for i in range(1,len(b)):
                         b[0] -= b[i]
 
+                    # Data to hide
+                    seed = random_scalar()
+                    aux1 = random_scalar()
+                    aux2 = random_scalar()
+
                     # Set keys and commitments
                     M = [random_point() for _ in range(2**m)] # possible signing keys
                     P = [random_point() for _ in range(2**m)] # corresponding commitments
@@ -40,6 +45,9 @@ class TestValidProofs(unittest.TestCase):
                         P[l[i]] = s[i]*G + a[i]*H
 
                     # Run test
-                    self.assertTrue(triptych.verify(M,P,Q,triptych.prove(M,P,Q,l,r,s,t,a,b,m),m))
+                    proof = triptych.prove(M,P,Q,l,r,s,t,a,b,m,seed,aux1,aux2)
+                    aux1_,aux2_ = triptych.verify(M,P,Q,proof,m)
+                    self.assertEqual(aux1,aux1_)
+                    self.assertEqual(aux2,aux2_)
 
 unittest.TextTestRunner(verbosity=2,failfast=True).run(unittest.TestLoader().loadTestsFromTestCase(TestValidProofs))

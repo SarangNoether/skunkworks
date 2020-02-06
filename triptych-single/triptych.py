@@ -88,7 +88,7 @@ def convolve(x,y,size=None):
 
     return r
 
-# Perform a multi-index commitment-to-zero proof
+# Perform a commitment-to-zero proof
 #
 # INPUT
 #  M: public key list
