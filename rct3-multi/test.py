@@ -7,6 +7,11 @@ import signature
 import pybullet
 import spend
 
+# Data hiding values
+seed = random_scalar()
+aux1 = random_scalar()
+aux2 = random_scalar()
+
 class Coin:
     # Generate a new coin
     # INPUTS
@@ -163,7 +168,7 @@ class SpendTransaction:
             d -= coins_out[i].mask
 
         # Generate spend proof
-        spend_proof = spend.prove([coin.P for coin in coins_in],[coin.C for coin in coins_in],l,[coins_in[l[i]].v for i in range(len(l))],[coins_in[l[i]].mask for i in range(len(l))],[coins_in[l[i]].p for i in range(len(l))],d)
+        spend_proof = spend.prove([coin.P for coin in coins_in],[coin.C for coin in coins_in],l,[coins_in[l[i]].v for i in range(len(l))],[coins_in[l[i]].mask for i in range(len(l))],[coins_in[l[i]].p for i in range(len(l))],d,seed,aux1,aux2)
 
         self.coins_in = coins_in
         self.coins_out = coins_out
@@ -174,7 +179,10 @@ class SpendTransaction:
     # Verify the spend operation
     def verify(self):
         # Verify spend proof
-        spend.verify(self.spend_proof,[coin.P for coin in self.coins_in],[coin.C for coin in self.coins_in],[coin.C for coin in self.coins_out]+[com(self.f,Scalar(0))])
+        aux1_,aux2_ = spend.verify(self.spend_proof,[coin.P for coin in self.coins_in],[coin.C for coin in self.coins_in],[coin.C for coin in self.coins_out]+[com(self.f,Scalar(0))])
+
+        if not (aux1_ == aux1 and aux2_ == aux2):
+            raise ArithmeticError('Failed to recover hidden data!')
 
         # Verify range proof
         pybullet.verify([self.range_proof],BITS)

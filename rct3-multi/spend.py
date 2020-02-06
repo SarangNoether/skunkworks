@@ -27,6 +27,7 @@ class SpendProof:
         self.t = None
         self.U = None # list (key images)
         self.P = None
+        self.seed = None
 
 # Data for a round of the inner product argument
 class InnerProductRound:
@@ -86,9 +87,12 @@ def inner_product(data):
 #   kappa: input masks (Scalar list)
 #   sk: secret keys (Scalar list)
 #   delta: difference of input and output masks (Scalar)
+#   seed: seed for data hiding (optional)
+#   aux1: auxiliary data to store (optional)
+#   aux2: auxiliary data to store (optional)
 # OUTPUTS
 #   proof: spend proof
-def prove(pk,C_in,k,a,kappa,sk,delta):
+def prove(pk,C_in,k,a,kappa,sk,delta,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
     M = len(k) # number of spends
 
     # Sanity checks
@@ -143,12 +147,12 @@ def prove(pk,C_in,k,a,kappa,sk,delta):
 
     # Point generation
     H = hash_to_point(tr.challenge())
-    alpha1 = random_scalar()
-    alpha2 = random_scalar()
+    alpha1 = random_scalar() if seed is None else hash_to_scalar(seed,pk,C_in,Ui,'alpha1')
+    alpha2 = random_scalar() if seed is None else hash_to_scalar(seed,pk,C_in,Ui,'alpha2')
     beta = random_scalar()
     p = random_scalar()
-    r_a1 = random_scalar()
-    r_a2 = random_scalar()
+    r_a1 = random_scalar() if seed is None else hash_to_scalar(seed,pk,C_in,Ui,'r_a1') + aux1
+    r_a2 = random_scalar() if seed is None else hash_to_scalar(seed,pk,C_in,Ui,'r_a2') + aux2
     r_sk = [random_scalar() for _ in range(M)]
     r_d = random_scalar()
     sL = ScalarVector([random_scalar() for _ in range(M*RING)])
@@ -278,6 +282,7 @@ def prove(pk,C_in,k,a,kappa,sk,delta):
     proof.t = t
     proof.U = Ui
     proof.P = P
+    proof.seed = seed
     return proof
 
 # Verify a spend proof
@@ -287,6 +292,8 @@ def prove(pk,C_in,k,a,kappa,sk,delta):
 #   pk: list of public keys (Point list)
 #   C_in: list of input commitments (Point list)
 #   C_out: list of output commitments (Point list)
+# RETURNS
+#   auxiliary data if the proof is valid
 def verify(proof,pk,C_in,C_out):
     # Begin transcript
     tr = transcript.Transcript('RCT3 spend')
@@ -331,6 +338,11 @@ def verify(proof,pk,C_in,C_out):
         tr.update(proof.z_sk[j])
     tr.update(proof.z_d)
     x_ip = tr.challenge()
+
+    # Recover hidden data if present
+    if proof.seed is not None:
+        aux1 = proof.z_a1 - (hash_to_scalar(proof.seed,pk,C_in,proof.U,'alpha1')*x + hash_to_scalar(proof.seed,pk,C_in,proof.U,'r_a1'))
+        aux2 = proof.z_a2 - (hash_to_scalar(proof.seed,pk,C_in,proof.U,'alpha2')*x + hash_to_scalar(proof.seed,pk,C_in,proof.U,'r_a2'))
 
     # Useful vectors
     vec_1 = ScalarVector([Scalar(1)]*(M*RING))
@@ -464,3 +476,5 @@ def verify(proof,pk,C_in,C_out):
 
     if not multiexp(check) == Z:
         raise ArithmeticError('Failed verification!')
+
+    return aux1,aux2
