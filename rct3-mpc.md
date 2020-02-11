@@ -10,31 +10,10 @@ It should be assumed insecure in the presence of malicious players who can devia
 
 We assume that a signing private key has been produced using the method of [Goodell and Noether](https://eprint.iacr.org/2018/774), which uses [MuSig](https://eprint.iacr.org/2018/068)-style key aggregation applied to one-time addresses.
 The approach follows two separate goals: one is to derive the shared key image, which is of the form `1/r*U` for a globally-fixed group element `U`.
-A method of [Gennaro and Goldfeder](https://eprint.iacr.org/2019/114) can be modified for this purpose, requiring a many-to-many share derivation that we describe below.
+A method of [Gennaro and Goldfeder](https://eprint.iacr.org/2019/114) can be modified for this purpose, requiring a many-to-many share derivation described elsewhere.
 The second goal is simply to compute a quantity that is linear in the shared secret key `r`; by assuming only honest-but-curious players, this is straightforward and only requires communication with a designated player, here called the dealer, who is unable to learn any other players' secret shares.
 
 Note that verification of an RCT3 MPC transaction necessarily proceeds identically to a standard transaction.
-
-
-## Key image
-
-Suppose we have `n` honest-but-curious players in the MPC, one of whom is arbitrarily selected as a dealer.
-Each player `i` holds a secret share `r_i` of the secret key `r`, so that `r_1 + ... + r_n = r`.
-Further, each player `i` holds a Paillier secret key, the public key of which has previously been distributed to all other players.
-
-Each player `i` chooses a random scalar `g_i` and sets `G_i := g_i*U`.
-Player `i` then computes the quantity `c_i := E_i(r_i)`, where `E_i` represents Paillier encryption using the public key for player `i`, and sends `c_i` to each player `j`.
-Player `j` chooses a random scalar `b_ji` for each such receipt.
-Player `j` computes `c_j := g_j*c_i + E_i(-b_ji)` using Paillier homomorphicity, and sends `c_j` back to player `i`.
-Player `i` sets `a_ij := D_i(c_j)`, where `D_i` represents Paillier decryption using the secret key for player `i`.
-
-After all players have completed this exchange, each player `i` holds scalars `a_ij` and `b_ij` for each other player `j`.
-Each player `i` computes `d_i := r_i*g_i + Sum[a_ij + b_ij]`, where the sum is taken over all other `j`, and sends `d_i` and `G_i` to the dealer.
-
-The dealer computes `d := d_1 + ... + d_n`.
-The dealer then computes `U' := 1/d*(G_1 + ... G_n)`; this is the shared key image `1/r*U`, which the dealer sends to all players.
-
-Insecure example code demonstrating this computation is [available](https://github.com/SarangNoether/skunkworks/blob/inverse-mpc/inverse.py), but should not be used in production.
 
 
 ## Proof
