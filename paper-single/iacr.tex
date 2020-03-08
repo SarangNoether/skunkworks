@@ -128,7 +128,7 @@ Figures \ref{fig:link} and \ref{fig:link_2} describe the protocol.
 $\underline{\mathcal{P}_{\text{link}}(\{M_i\},J;(l,r)):}$
 \begin{itemize}
 \item Select random $r_A \in \F$ and $\left\{a_{j,i}\right\}_{i=1,j=0}^{n-1,m-1} \subset \F$.
-Define $A \equiv \com(a,r_A)$.
+Set $$\{a_{j,0}\}_{j=0}^{m-1} \equiv -\sum_{i=1}^{n-1} a_{j,i}$$ and define $A \equiv \com(a,r_A)$.
 \item Define $\left\{\sigma_{j,i}\right\}_{i,j=0}^{n-1,j-1} \subset \F$ such that $\sigma_{j,i} \equiv \delta\left(l_j,i\right)$ (using our decomposition notation), and choose random $r_B \in \F$.
 Define $B \equiv \com(\sigma,r_B)$.
 \item Select random $r_C \in \F$, and define $C \equiv \com(a(1-2\sigma), r_C)$.
