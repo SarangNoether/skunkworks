@@ -166,7 +166,7 @@ class Player:
             raise Exception('Incorrect state!')
 
         self.beta[friend.get_ident()] = random_scalar()
-        d = pow(c,self.gamma.x,friend.get_public_key().N**2)
+        d = pow(c,int(self.gamma),friend.get_public_key().N**2)
         d = (d*friend.get_public_key().encrypt(-self.beta[friend.get_ident()])) % friend.get_public_key().N**2
 
         return d
