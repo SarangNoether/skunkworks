@@ -61,7 +61,7 @@ def sign(M,p,P,z,C,seed=None,index=None):
 
     # Scalars are either random (seed is None) or hash-constructed
     if seed is None:
-        s = [random_scalar()]*n
+        s = [random_scalar() for _ in range(n)]
     else:
         s = [hash_to_scalar('CLSAG_scalar',seed,I,i) for i in range(n)]
 

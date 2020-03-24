@@ -123,18 +123,18 @@ class TestTransaction(unittest.TestCase):
         amount_in = Scalar(3)
         blinder_in = random_scalar()
         amounts_out = [Scalar(2),Scalar(1)]
-        blinders_out = [random_scalar()]*2
+        blinders_out = [random_scalar(),random_scalar()]
 
         C_in = H*amount_in + G*blinder_in
         C_out = [H*amounts_out[i] + G*blinders_out[i] for i in range(2)]
         z = blinder_in - blinders_out[0] - blinders_out[1]
 
         # Construct commitment offsets and keys
-        C = [random_point()-C_out[0]-C_out[1]]*n
+        C = [random_point()-C_out[0]-C_out[1] for _ in range(n)]
         C[l] = C_in-C_out[0]-C_out[1]
 
         p = random_scalar()
-        P = [random_point()]*n
+        P = [random_point() for _ in range(n)]
         P[l] = G*p
 
         # Generate signature and verify
@@ -152,7 +152,7 @@ class TestTransaction(unittest.TestCase):
         amount_in = Scalar(3)
         blinder_in = random_scalar()
         amounts_out = [Scalar(2),Scalar(1)]
-        blinders_out = [random_scalar()]*2
+        blinders_out = [random_scalar(),random_scalar()]
 
         C_in = H*amount_in + G*blinder_in
         C_out = [H*amounts_out[i] + G*blinders_out[i] for i in range(2)]
@@ -161,11 +161,11 @@ class TestTransaction(unittest.TestCase):
         C_pseudo = H*amount_in + G*blinder_pseudo_in
         z = blinder_in-blinder_pseudo_in
 
-        C = [random_point()-C_pseudo]*n
+        C = [random_point()-C_pseudo for _ in range(n)]
         C[l] = C_in-C_pseudo
 
         p = random_scalar()
-        P = [random_point()]*n
+        P = [random_point() for _ in range(n)]
         P[l] = G*p
 
         # Generate signature and verify

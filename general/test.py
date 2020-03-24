@@ -8,7 +8,7 @@ import unittest
 
 # Sign and verify with arbitrary index, inputs, and ring size
 def build(l,m,n):
-    p = [random_scalar()]*m
+    p = [random_scalar() for _ in range(m)]
     P = []
     for i in range(n):
         P.append([])
@@ -47,14 +47,14 @@ class TestTransaction(unittest.TestCase):
         amount_in = Scalar(3)
         blinder_in = random_scalar()
         amounts_out = [Scalar(2),Scalar(1)]
-        blinders_out = [random_scalar()]*2
+        blinders_out = [random_scalar(),random_scalar()]
 
         C_in = H*amount_in + G*blinder_in
         C_out = [H*amounts_out[i] + G*blinders_out[i] for i in range(2)]
         z = blinder_in - blinders_out[0] - blinders_out[1]
 
         # Construct commitment offsets and keys
-        C = [random_point()-C_out[0]-C_out[1]]*n
+        C = [random_point()-C_out[0]-C_out[1] for _ in range(n)]
         C[1] = C_in-C_out[0]-C_out[1]
 
         p = [random_scalar(),z]
@@ -71,16 +71,16 @@ class TestTransaction(unittest.TestCase):
 
         # Generate input and output commitments
         amounts_in = [Scalar(2),Scalar(3)]
-        blinders_in = [random_scalar()]*2
+        blinders_in = [random_scalar(),random_scalar()]
         amounts_out = [Scalar(4),Scalar(1)]
-        blinders_out = [random_scalar()]*2
+        blinders_out = [random_scalar(),random_scalar()]
 
         C_in = [H*amounts_in[i] + G*blinders_in[i] for i in range(2)]
         C_out = [H*amounts_out[i] + G*blinders_out[i] for i in range(2)]
         z = blinders_in[0] + blinders_in[1] - blinders_out[0] - blinders_out[1]
 
         # Construct commitment offsets and keys
-        C = [random_point()-C_out[0]-C_out[1]]*n
+        C = [random_point()-C_out[0]-C_out[1] for _ in range(n)]
         C[1] = C_in[0]+C_in[1]-C_out[0]-C_out[1]
 
         p = [random_scalar(),random_scalar(),z]
@@ -99,7 +99,7 @@ class TestTransaction(unittest.TestCase):
         amount_in = Scalar(3)
         blinder_in = random_scalar()
         amounts_out = [Scalar(2),Scalar(1)]
-        blinders_out = [random_scalar()]*2
+        blinders_out = [random_scalar(),random_scalar()]
 
         C_in = H*amount_in + G*blinder_in
         C_out = [H*amounts_out[i] + G*blinders_out[i] for i in range(2)]
@@ -108,7 +108,7 @@ class TestTransaction(unittest.TestCase):
         C_pseudo = H*amount_in + G*blinder_pseudo_in
         z = blinder_in-blinder_pseudo_in
 
-        C = [random_point()-C_pseudo]*n
+        C = [random_point()-C_pseudo for _ in range(n)]
         C[1] = C_in-C_pseudo
 
         p = [random_scalar(),z]

@@ -60,7 +60,7 @@ def sign(M,p,P):
         mu.append(hash_to_scalar(j,P,I))
     h = [None]*n
     alpha = random_scalar()
-    s = [random_scalar()]*n
+    s = [random_scalar() for _ in range(n)]
 
     # Private index
     L = G*alpha
