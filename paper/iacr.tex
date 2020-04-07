@@ -239,31 +239,31 @@ Similarly, Equation \ref{eqn:cd} holds from the identity $$(\sigma_{j,i}^{(u)})^
 
 Next, we show that Equation \ref{eqn:x} holds:
 \begin{eqnarray*}
-&& \sumk \mu_kM_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jX_j - \sumu z^{(u)}_RG \\
-&=& \sumk \mu_kM_k p_k(x) - \sumj x^j \left( \sumk p_{k,j}\mu_kM_k + \sumu \rho^{(u)}_jG \right) - \sumu z^{(u)}_RG \\
-&=& \sumk \mu_kM_k \left( p_k(x) - \sumj x^j p_{k,j} \right) - \sumj x^j \sumu \rho^{(u)}_jG - \sumu z^{(u)}_RG \\
-&=& \sumk \mu_kM_k \left[ x^m \sumu \delta\left( l^{(u)},k \right) \right] - \sumj x^j \sumu \rho^{(u)}_jG - \sumu\left[ \mu_{l^{(u)}}r^{(u)}x^m - \sumj \rho^{(u)}_jx^j \right]G \\
-&=& x^m\sumu \mu_{l^{(u)}}r^{(u)}G - \sumj x^j \sumu \rho^{(u)}_jG - x^m\sumu \mu_{l^{(u)}}r^{(u)}G + \sumj x^j \sumu \rho^{(u)}_jG \\
+&& \sumk \mu_kM_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj \xi^jX_j - \sumu z^{(u)}_RG \\
+&=& \sumk \mu_kM_k p_k(\xi) - \sumj \xi^j \left( \sumk p_{k,j}\mu_kM_k + \sumu \rho^{(u)}_jG \right) - \sumu z^{(u)}_RG \\
+&=& \sumk \mu_kM_k \left( p_k(\xi) - \sumj \xi^j p_{k,j} \right) - \sumj \xi^j \sumu \rho^{(u)}_jG - \sumu z^{(u)}_RG \\
+&=& \sumk \mu_kM_k \left[ \xi^m \sumu \delta\left( l^{(u)},k \right) \right] - \sumj \xi^j \sumu \rho^{(u)}_jG - \sumu\left[ \mu_{l^{(u)}}r^{(u)}\xi^m - \sumj \rho^{(u)}_j\xi^j \right]G \\
+&=& \xi^m\sumu \mu_{l^{(u)}}r^{(u)}G - \sumj \xi^j \sumu \rho^{(u)}_jG - \xi^m\sumu \mu_{l^{(u)}}r^{(u)}G + \sumj \xi^j \sumu \rho^{(u)}_jG \\
 &=& 0
 \end{eqnarray*}
 
 Equation \ref{eqn:y} holds with similar algebra:
 \begin{eqnarray*}
-&& \sumk \mu_kU \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jY_j - \sumu z^{(u)}_RJ^{(u)} \\
-&=& \sumk \mu_kU p_k(x) - \sumj x^j \left( \sumk p_{k,j}\mu_kU + \sumu \rho^{(u)}_jJ^{(u)} \right) - \sumu z^{(u)}_RJ^{(u)} \\
-&=& \sumk \mu_kU \left( p_k(x) - \sumj x^j p_{k,j} \right) - \sumj x^j \sumu \rho^{(u)}_jJ^{(u)} - \sumu z^{(u)}_RJ^{(u)} \\
-&=& \sumk \mu_kU \left[ x^m \sumu \delta\left( l^{(u)},k \right) \right] - \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}U - \sumu\left[ \mu_{l^{(u)}}r^{(u)}x^m - \sumj \rho^{(u)}_jx^j \right](r^{(u)})^{-1}U \\
-&=& x^m\sumu \mu_{l^{(u)}}U - \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}U - x^m\sumu \mu_{l^{(u)}}U + \sumj x^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}U \\
+&& \sumk \mu_kU \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj \xi^jY_j - \sumu z^{(u)}_RJ^{(u)} \\
+&=& \sumk \mu_kU p_k(\xi) - \sumj \xi^j \left( \sumk p_{k,j}\mu_kU + \sumu \rho^{(u)}_jJ^{(u)} \right) - \sumu z^{(u)}_RJ^{(u)} \\
+&=& \sumk \mu_kU \left( p_k(\xi) - \sumj \xi^j p_{k,j} \right) - \sumj \xi^j \sumu \rho^{(u)}_jJ^{(u)} - \sumu z^{(u)}_RJ^{(u)} \\
+&=& \sumk \mu_kU \left[ \xi^m \sumu \delta\left( l^{(u)},k \right) \right] - \sumj \xi^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}U - \sumu\left[ \mu_{l^{(u)}}r^{(u)}\xi^m - \sumj \rho^{(u)}_j\xi^j \right](r^{(u)})^{-1}U \\
+&=& x^m\sumu \mu_{l^{(u)}}U - \sumj \xi^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}U - \xi^m\sumu \mu_{l^{(u)}}U + \sumj \xi^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}U \\
 &=& 0
 \end{eqnarray*}
 
 Finally, we show that Equation \ref{eqn:z} holds:
 \begin{eqnarray*}
-&& \sumk P_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj x^jZ_j - x^m\sum_{j=0}^{T-1} Q_j - z_SG \\
-&=& \sumk P_k p_k(x) - \sumj x^j \left( \sumk p_{k,j}P_k + \sumu \overline{\rho}^{(u)}_jG \right) - x^m\sum_{j=0}^{T-1} Q_j - z_SG \\
-&=& \sumk P_k \left( p_k(x) - \sumj x^j p_{k,j} \right) - \sumj x^j \sumu \overline{\rho}^{(u)}_jG - x^m\sum_{j=0}^{T-1} Q_j - z_SG \\
-&=& x^m\sumu (s^{(u)}G + a_uH) - \sumj x^j \sumu \overline{\rho}^{(u)}_jG - x^m\sum_{j=0}^{T-1} (t_jG + b_jH) - x^m\left( \sumu s^{(u)} - \sum_{j=0}^{T-1} t_j \right)G + \\
-&& \sumj x^j \sumu \overline{\rho}^{(u)}_jG \\
+&& \sumk P_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj \xi^jZ_j - \xi^m\sum_{j=0}^{T-1} Q_j - z_SG \\
+&=& \sumk P_k p_k(\xi) - \sumj \xi^j \left( \sumk p_{k,j}P_k + \sumu \overline{\rho}^{(u)}_jG \right) - \xi^m\sum_{j=0}^{T-1} Q_j - z_SG \\
+&=& \sumk P_k \left( p_k(\xi) - \sumj \xi^j p_{k,j} \right) - \sumj \xi^j \sumu \overline{\rho}^{(u)}_jG - \xi^m\sum_{j=0}^{T-1} Q_j - z_SG \\
+&=& \xi^m\sumu (s^{(u)}G + a_uH) - \sumj \xi^j \sumu \overline{\rho}^{(u)}_jG - \xi^m\sum_{j=0}^{T-1} (t_jG + b_jH) - \xi^m\left( \sumu s^{(u)} - \sum_{j=0}^{T-1} t_j \right)G + \\
+&& \sumj \xi^j \sumu \overline{\rho}^{(u)}_jG \\
 &=& \left( \sumu a_u - \sum_{j=0}^{T-1} b_j \right)H \\
 &=& 0
 \end{eqnarray*}
