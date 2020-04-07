@@ -31,8 +31,8 @@ BATCH = args.batch_size # 0 is per block, otherwise fixed number of transactions
 data = open(args.data_file,'r') # data file
 
 # Size and time data
-size = {'triptych-single':0, 'triptych-multi':0, 'rct3-single':0, 'rct3-multi':0, 'clsag':0, 'mlsag':0} # in group/field elements
-time = {'triptych-single':0, 'triptych-multi':0, 'rct3-single':0, 'rct3-multi':0} # in linear combination counts
+size = {'triptych':0, 'arcturus':0, 'rct3-single':0, 'rct3-multi':0, 'clsag':0, 'mlsag':0} # in group/field elements
+time = {'triptych':0, 'arcturus':0, 'rct3-single':0, 'rct3-multi':0} # in linear combination counts
 actual_size = 0 # real chain growth (in bytes)
 
 # Cache data
@@ -45,8 +45,8 @@ for i in range(1,16+1):
 def timing(i):
     return float(7572-398)/(190000-10000)*(i-10000)+398
 
-# Single-input Triptych
-def triptych_single(M,T):
+# Triptych
+def triptych(M,T):
     total = 0
     total += M*(3*_logN + 8) # spend proofs
     total += M # input key images
@@ -58,7 +58,7 @@ def triptych_single(M,T):
     total += T # transaction keys
     total += 1 # payment ID
     return total
-def batch_triptych_single(batch):
+def batch_triptych(batch):
     sum_M = sum([datum[0] for datum in batch]) # M_1 + M_2 + ... + M_B
     sum_T = sum([datum[1] for datum in batch]) # T_1 + T_2 + ... + T_B
     max_T = max([datum[1] for datum in batch]) # max(T_1, ..., T_B)
@@ -70,8 +70,8 @@ def batch_triptych_single(batch):
     total += 4*B + sum_T + 2*sum([math.log2(64*datum[1]) for datum in batch]) + 128*max_T + 2 # range proofs
     return total
 
-# Multi-input Triptych
-def triptych_multi(M,T):
+# Arcturus
+def arcturus(M,T):
     total = 0
     total += _logN*(M + 3) + M + 7 # spend proof
     total += M # input key images
@@ -82,7 +82,7 @@ def triptych_multi(M,T):
     total += T # transaction keys
     total += 1 # payment ID
     return total
-def batch_triptych_multi(batch):
+def batch_arcturus(batch):
     sum_M = sum([datum[0] for datum in batch]) # M_1 + M_2 + ... + M_B
     sum_T = sum([datum[1] for datum in batch]) # T_1 + T_2 + ... + T_B
     max_M = max([datum[0] for datum in batch]) # max(M_1, ..., M_B)
@@ -194,8 +194,8 @@ for line in data:
     # Run size computations
     ins = int(line[COL_INS])
     outs = int(line[COL_OUTS])
-    size['triptych-single'] += triptych_single(ins,outs)
-    size['triptych-multi'] += triptych_multi(ins,outs)
+    size['triptych'] += triptych(ins,outs)
+    size['arcturus'] += arcturus(ins,outs)
     size['rct3-single'] += rct3_single(ins,outs)
     size['rct3-multi'] += rct3_multi(ins,outs)
     size['clsag'] += clsag(ins,outs)
@@ -206,8 +206,8 @@ for line in data:
     if (BATCH == 0 and int(line[COL_BLOCK]) == batch_height) or (BATCH > 0 and len(batch_data) < BATCH): # still on the same batch
         batch_data.append([int(line[COL_INS]),int(line[COL_OUTS])])
     else: # new batch, who dis
-        time['triptych-single'] += timing(batch_triptych_single(batch_data)) # process the batch
-        time['triptych-multi'] += timing(batch_triptych_multi(batch_data)) # process the batch
+        time['triptych'] += timing(batch_triptych(batch_data)) # process the batch
+        time['arcturus'] += timing(batch_arcturus(batch_data)) # process the batch
         time['rct3-single'] += timing(batch_rct3_single(batch_data)) # process the batch
         time['rct3-multi'] += timing(batch_rct3_multi(batch_data)) # process the batch
         batch_data = []
