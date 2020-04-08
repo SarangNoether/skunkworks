@@ -11,7 +11,7 @@ class TestValidProofs(unittest.TestCase):
     def test_valid_prove_verify(self):
         print ''
 
-        for m in [1,2]: # ring size 2,4
+        for m in [2,3]: # ring size 4,8
             for spends in range(1,min(3,2**m)+1):
                 for outs in [1,2,3]:
                     print 'Test parameters (m spends outs):',m,spends,outs
