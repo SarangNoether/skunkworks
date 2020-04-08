@@ -11,7 +11,7 @@ class TestValidProofs(unittest.TestCase):
     def test_valid_prove_verify(self):
         print ''
 
-        for m in [1,2]: # ring size 2,4
+        for m in [2,3]: # ring size 4,8
             print 'Test parameter (m):',m
             l = random.randrange(2**m) # spend index
             r = random_scalar() # signing key

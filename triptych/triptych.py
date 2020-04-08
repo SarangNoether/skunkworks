@@ -74,17 +74,15 @@ def delta(x,y):
         return Scalar(1)
     return Scalar(0)
 
-# Compute a convolution
-def convolve(x,y,size=None):
-    r = [Scalar(0)]*(len(x)+len(y))
+# Compute a convolution with a degree-one polynomial
+def convolve(x,y):
+    if not len(y) == 2:
+        raise ValueError('Convolution requires a degree-one polynomial!')
+
+    r = [Scalar(0)]*(len(x)+1)
     for i in range(len(x)):
         for j in range(len(y)):
             r[i+j] += x[i]*y[j]
-
-    # Pad with zeros
-    if size is not None and size > len(r):
-        for i in range(size-len(r)):
-            r.append(Scalar(0))
 
     return r
 
@@ -156,13 +154,13 @@ def prove(M,P,l,r,s,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
     D = com_matrix(a_sq,rD)
 
     # Compute p coefficients
-    p = [[Scalar(0) for _ in range(m)] for _ in range(N)]
+    p = [[] for _ in range(N)]
     for k in range(N):
         decomp_k = decompose(k,n,m)
         p[k] = [a[0][decomp_k[0]],delta(decomp_l[0],decomp_k[0])]
         
         for j in range(1,m):
-            p[k] = convolve(p[k],[a[j][decomp_k[j]],delta(decomp_l[j],decomp_k[j])],m)
+            p[k] = convolve(p[k],[a[j][decomp_k[j]],delta(decomp_l[j],decomp_k[j])])
 
     # Generate proof values
     X = [dumb25519.Z for _ in range(m)]
@@ -230,6 +228,9 @@ def prove(M,P,l,r,s,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
 # RETURNS
 #  auxiliary data if the proof is valid
 def verify(M,P,proof,m):
+    if not m > 1:
+        raise ValueError('Must have m > 1!')
+
     n = 2
     N = n**m
     tr = transcript.Transcript('Triptych single-input')
