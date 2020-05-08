@@ -145,8 +145,7 @@ def prove(M,P,Q,l,r,s,t,a,b,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
     for j in range(m):
         for u in range(w):
             a[u][j][0] = Scalar(0)
-        for i in range(1,n):
-            for u in range(w):
+            for i in range(1,n):
                 a[u][j][0] -= a[u][j][i]
     A = com_tensor(a,rA)
 
