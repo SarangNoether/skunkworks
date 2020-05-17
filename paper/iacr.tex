@@ -548,7 +548,7 @@ This form of batching does not apply to CLSAG, where verification consists of a 
 
 Table \ref{table:size} compares proof/signature sizes and verification complexity for these constructions as a function of the anonymity set size $N$ and batch size $B$.
 Verification complexity is separated into the number of hash-to-$\F$ operations (denoted $\hs$), hash-to-$\G$ operations (denoted $\hp$), and $i$-multiscalar multiplication operations of size $k(i)$.
-Figure \ref{fig:size} examines size as a function of input anonymity set size, under the assumption that elements of both $\G$ and $\F$ occupy $32$ kB of space.
+Figure \ref{fig:size} examines size as a function of input anonymity set size, under the assumption that elements of both $\G$ and $\F$ occupy $32$ bytes of space.
 We note that although RingCT 3.0 proofs are slightly smaller for large $N$, Triptych proofs are smaller for $N < 512$, a limited but reasonable range given practical verification times.
 We also note that the application of Triptych in a complete transaction protocol is not directly compared to RingCT 3.0 here, as the use of non-proof/signature auxiliary data in such a protocol may differ based on particular implementations.
 
