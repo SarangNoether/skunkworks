@@ -36,7 +36,7 @@ try:
             f.seek(-2,os.SEEK_CUR)
         last_line = f.readline().decode().strip().split(' ')
 
-    transction_index = int(last_line[0]) + 1
+    transaction_index = int(last_line[0]) + 1
     last_block = int(last_line[1])
 except:
     # The file does not already exist
