@@ -20,9 +20,9 @@ print('Fetching timestamp data...')
 session = requests.Session()
 mapped = {} # { height: [year, month] }
 try:
-    end_height = int(session.get('{}://{}:{}/api/networkinfo'.format('https' if args.tls else 'http',args.server,args.port).json()['data']['height']))
+    end_height = session.get('{}://{}:{}/api/networkinfo'.format('https' if args.tls else 'http',args.server,args.port)).json()['data']['height']
 except:
-    print('Server did not respond. Not a big deal; just run the tool again.')
+    raise Exception('Server did not respond. Not a big deal; just run the tool again.')
 
 for block in range(0,end_height,args.precision):
     timestamp = session.get('{}://{}:{}/api/block/{}'.format('https' if args.tls else 'http',args.server,args.port,block if block != 0 else 1)).json()['data']['timestamp_utc'].split('-')

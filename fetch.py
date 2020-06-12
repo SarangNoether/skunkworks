@@ -97,4 +97,5 @@ with open(args.file_transactions,'a') as file_transactions, open(args.file_rings
             # We don't assume atomicity, so warn the user if the write might be bad
             raise Exception('***WARNING*** File writes may be incomplete! You should manually check the data files.')
 
+print()
 print('Done!')
