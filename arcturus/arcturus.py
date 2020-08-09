@@ -234,11 +234,12 @@ def prove(M,P,Q,l,r,s,t,a,b,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
     tr.update(Z)
     x = tr.challenge()
 
-    f = [[[None for _ in range(n)] for _ in range(m)] for _ in range(w)]
+    # Construct matrix
+    f = [[[None for _ in range(n-1)] for _ in range(m)] for _ in range(w)]
     for j in range(m):
         for i in range(1,n):
             for u in range(w):
-                f[u][j][i] = sigma[u][j][i]*x + a[u][j][i]
+                f[u][j][i-1] = sigma[u][j][i]*x + a[u][j][i]
 
     zA = rB*x + rA
     zC = rC*x + rD
@@ -283,6 +284,7 @@ def verify(M,P,Q,proof,m):
     tr = transcript.Transcript('Arcturus')
 
     J = proof.J
+    w = len(J)
     A = proof.A
     B = proof.B
     C = proof.C
@@ -290,7 +292,7 @@ def verify(M,P,Q,proof,m):
     X = proof.X
     Y = proof.Y
     Z = proof.Z
-    f = proof.f
+    f = [[[None for _ in range(n)] for _ in range(m)] for _ in range(w)]
     zA = proof.zA
     zC = proof.zC
     zR = proof.zR
@@ -311,7 +313,13 @@ def verify(M,P,Q,proof,m):
     tr.update(Z)
     x = tr.challenge()
 
-    w = len(J)
+    # Reconstruct matrix
+    for j in range(m):
+        for u in range(w):
+            f[u][j][0] = x
+            for i in range(1,n):
+                f[u][j][i] = proof.f[u][j][i-1]
+                f[u][j][0] -= f[u][j][i]
 
     # Recover hidden data if present
     if seed is not None:
