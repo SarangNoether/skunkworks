@@ -198,10 +198,11 @@ def prove(M,P,l,r,s,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
     tr.update(Y)
     x = tr.challenge()
 
-    f = [[None for _ in range(n)] for _ in range(m)]
+    # Construct matrix
+    f = [[None for _ in range(n-1)] for _ in range(m)]
     for j in range(m):
         for i in range(1,n):
-            f[j][i] = sigma[j][i]*x + a[j][i]
+            f[j][i-1] = sigma[j][i]*x + a[j][i]
 
     zA = rB*x + rA
     zC = rC*x + rD
@@ -243,7 +244,7 @@ def verify(M,P,proof,m):
     D = proof.D
     X = proof.X
     Y = proof.Y
-    f = proof.f
+    f = [[None for _ in range(n)] for _ in range(m)]
     zA = proof.zA
     zC = proof.zC
     z = proof.z
@@ -262,6 +263,13 @@ def verify(M,P,proof,m):
     tr.update(X)
     tr.update(Y)
     x = tr.challenge()
+
+    # Reconstruct matrix
+    for j in range(m):
+        f[j][0] = x
+        for i in range(1,n):
+            f[j][i] = proof.f[j][i-1]
+            f[j][0] -= f[j][i]
 
     # Recover hidden data if present
     if seed is not None:
