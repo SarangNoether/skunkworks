@@ -4,10 +4,10 @@ import unittest
 
 class TestInnerProduct(unittest.TestCase):
     def test_valid(self):
-        for N in range(1,8):
-            a = dumb25519.ScalarVector([dumb25519.random_scalar()]*N)
-            b = dumb25519.ScalarVector([dumb25519.random_scalar()]*N)
-            pybullet.test(a,b,N)
+        print ''
+        for N in [2**i for i in range(4)]:
+            print 'Testing N =',N
+            pybullet.test(N)
 
 for test in [TestInnerProduct]:
     unittest.TextTestRunner(verbosity=2,failfast=True).run(unittest.TestLoader().loadTestsFromTestCase(test))
