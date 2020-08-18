@@ -38,65 +38,21 @@ class TestBullet(unittest.TestCase):
     def test_prove_verify_m_1_n_4(self):
         M = 1
         N = 4
-        seed = random_scalar()
-        aux = random_scalar()
         data = [[Scalar(random.randint(0,2**N-1)),random_scalar()] for i in range(M)]
-        aux_ = pybullet.verify([pybullet.prove(data,N,seed,aux)],N)
-        self.assertEqual(aux_[0],aux)
+        pybullet.verify(pybullet.prove(data,N),N)
 
     def test_prove_verify_m_2_n_4(self):
         M = 2
         N = 4
-        seed = random_scalar()
-        aux = random_scalar()
         data = [[Scalar(random.randint(0,2**N-1)),random_scalar()] for i in range(M)]
-        aux_ = pybullet.verify([pybullet.prove(data,N,seed,aux)],N)
-        self.assertEqual(aux_[0],aux)
+        pybullet.verify(pybullet.prove(data,N),N)
 
-    def test_invalid_value(self):
-        M = 1
-        N = 4
-        data = [[Scalar(random.randint(2**N,2**(N+1)-1)),random_scalar()]]
-        with self.assertRaises(ArithmeticError):
-            pybullet.verify([pybullet.prove(data,N)],N)
-
-    def test_batch_2_m_1_n_4(self):
-        M = 1
-        N = 4
-        seeds = [random_scalar(),random_scalar()]
-        aux = [random_scalar(),random_scalar()]
-        data = [[Scalar(random.randint(0,2**N-1)),random_scalar()] for i in range(M)]
-        proof1 = pybullet.prove(data,N,seeds[0],aux[0])
-        data = [[Scalar(random.randint(0,2**N-1)),random_scalar()] for i in range(M)]
-        proof2 = pybullet.prove(data,N,seeds[1],aux[1])
-        aux_ = pybullet.verify([proof1,proof2],N)
-        self.assertEqual(aux_[0],aux[0])
-        self.assertEqual(aux_[1],aux[1])
-
-    def test_batch_2_m_1_2_n_4(self):
-        M = 1
-        N = 4
-        seeds = [random_scalar(),random_scalar()]
-        aux = [random_scalar(),random_scalar()]
-        data = [[Scalar(random.randint(0,2**N-1)),random_scalar()] for i in range(M)]
-        proof1 = pybullet.prove(data,N,seeds[0],aux[0])
-        M = 2
-        data = [[Scalar(random.randint(0,2**N-1)),random_scalar()] for i in range(M)]
-        proof2 = pybullet.prove(data,N,seeds[1],aux[1])
-        aux_ = pybullet.verify([proof1,proof2],N)
-        self.assertEqual(aux_[0],aux[0])
-        self.assertEqual(aux_[1],aux[1])
-
-    def test_invalid_batch_2_m_1_2_n_4(self):
-        M = 1
-        N = 4
-        data = [[Scalar(random.randint(0,2**N-1)),random_scalar()] for i in range(M)]
-        proof1 = pybullet.prove(data,N)
-        M = 2
-        data = [[Scalar(random.randint(2**N,2**(N+1)-1)),random_scalar()] for i in range(M)]
-        proof2 = pybullet.prove(data,N)
-        with self.assertRaises(ArithmeticError):
-            pybullet.verify([proof1,proof2],N)
+#    def test_invalid_value(self):
+#        M = 1
+#        N = 4
+#        data = [[Scalar(random.randint(2**N,2**(N+1)-1)),random_scalar()]]
+#        with self.assertRaises(ArithmeticError):
+#            pybullet.verify(pybullet.prove(data,N),N)
 
 for test in [TestBulletOps,TestBullet]:
     unittest.TextTestRunner(verbosity=2,failfast=True).run(unittest.TestLoader().loadTestsFromTestCase(test))

@@ -6,40 +6,65 @@ inv8 = Scalar(8).invert()
 
 # Proof structure
 class Bulletproof:
-    def __init__(self,V,A,S,T1,T2,taux,mu,L,R,a,b,t,seed):
+    def __init__(self,V,A,A1,B,r1,s1,d1,L,R):
         self.V = V
         self.A = A
-        self.S = S
-        self.T1 = T1
-        self.T2 = T2
-        self.taux = taux
-        self.mu = mu
+        self.A1 = A1
+        self.B = B
+        self.r1 = r1
+        self.s1 = s1
+        self.d1 = d1
         self.L = L
         self.R = R
-        self.a = a
-        self.b = b
-        self.t = t
-        self.seed = seed # NOTE: included here for convenience, but not public data
 
 # Data for a round of the inner product argument
 class InnerProductRound:
-    def __init__(self,G,H,U,a,b,tr):
+    def __init__(self,Gi,Hi,G,H,P,a,b,alpha,y,tr):
         # Common data
+        self.Gi = Gi
+        self.Hi = Hi
         self.G = G
         self.H = H
-        self.U = U
+        self.P = P
+        self.y = y
         self.done = False
 
         # Prover data
         self.a = a
         self.b = b
+        self.alpha = alpha
 
-        # Verifier data (appended lists)
+        # Verifier data
+        self.A = None
+        self.B = None
+        self.r1 = None
+        self.s1 = None
+        self.d1 = None
         self.L = PointVector([])
         self.R = PointVector([])
 
         # Transcript
         self.tr = tr
+
+# Compute a weighted inner product
+#
+# INPUTS
+#   a,b: (ScalarVector)
+#   y: weight (Scalar)
+# OUTPUTS
+#   Scalar
+def wip(a,b,y):
+    if not len(a) == len(b):
+        raise IndexError('Weighted inner product vectors must have identical size!')
+    if not isinstance(a,ScalarVector) or not isinstance(b,ScalarVector):
+        raise TypeError('Weighted inner product requires ScalarVectors!')
+    if not isinstance(y,Scalar):
+        raise TypeError('Weighted inner product requires Scalar weight!')
+
+    r = Scalar(0)
+    for i in range(len(a)):
+        r += a[i]*y**(i+1)*b[i]
+    return r
 
 # Turn a scalar into a vector of bit scalars
 #
@@ -58,15 +83,19 @@ def scalar_to_bits(s,N):
             s -= Scalar(2**i)
     return ScalarVector(list(reversed(result)))
 
-# Generate a vector of powers of a scalar
+# Generate a vector of powers of a scalar, in either direction, indexed at 1
 #
 # INPUTS
 #   s: (Scalar)
 #   l: number of powers to include (int)
+#   desc: whether to use a descending indexing (bool)
 # OUTPUTS
 #   ScalarVector
-def exp_scalar(s,l):
-    return ScalarVector([s**i for i in range(l)])
+def exp_scalar(s,l,desc=False):
+    if desc:
+        return ScalarVector([s**(l-i) for i in range(l)])
+    else:
+        return ScalarVector([s**(i+1) for i in range(l)])
 
 # Sum the powers of a scalar
 #
@@ -96,296 +125,204 @@ def sum_scalar(s,l):
 # INPUTS
 #   data: round data (InnerProductRound)
 def inner_product(data):
-    n = len(data.G)
+    n = len(data.Gi)
+
+    # Sanity check
+    if not data.P == data.Gi**data.a + data.Hi**data.b + data.G*wip(data.a,data.b,data.y) + data.H*data.alpha:
+        raise ArithmeticError('Bad prover round!')
+
     if n == 1:
         data.done = True
-        data.a = data.a[0]
-        data.b = data.b[0]
-        return
 
+        # Random masks
+        r = random_scalar()
+        s = random_scalar()
+        d = random_scalar()
+        eta = random_scalar()
+
+        data.A = data.Gi[0]*r + data.Hi[0]*s + data.G*(r*data.y*data.b[0] + s*data.y*data.a[0]) + data.H*d
+        data.B = data.G*(r*data.y*s) + data.H*eta
+
+        data.tr.update(data.A)
+        data.tr.update(data.B)
+        e = data.tr.challenge()
+
+        data.r1 = r + data.a[0]*e
+        data.s1 = s + data.b[0]*e
+        data.d1 = eta + d*e + data.alpha*e**2
+
+        if not data.P*e**2 + data.A*e + data.B == data.Gi[0]*(data.r1*e) + data.Hi[0]*(data.s1*e) + data.G*(data.r1*data.y*data.s1) + data.H*data.d1:
+            raise ArithmeticError('Bad manual verifier!')
+
+        return
+    
     n /= 2
-    cL = data.a[:n]**data.b[n:]
-    cR = data.a[n:]**data.b[:n]
-    data.L.append((data.G[n:]**data.a[:n] + data.H[:n]**data.b[n:] + data.U*cL)*inv8)
-    data.R.append((data.G[:n]**data.a[n:] + data.H[n:]**data.b[:n] + data.U*cR)*inv8)
+    a1 = data.a[:n]
+    a2 = data.a[n:]
+    b1 = data.b[:n]
+    b2 = data.b[n:]
+    G1 = data.Gi[:n]
+    G2 = data.Gi[n:]
+    H1 = data.Hi[:n]
+    H2 = data.Hi[n:]
+
+    dL = random_scalar()
+    dR = random_scalar()
+
+    cL = wip(a1,b2,data.y)
+    cR = wip(a2*data.y**n,b1,data.y)
+    data.L.append(G2**(a1*data.y.invert()**n) + H1**b2 + data.G*cL + data.H*dL)
+    data.R.append(G1**(a2*data.y**n) + H2**b1 + data.G*cR + data.H*dR)
 
     data.tr.update(data.L[-1])
     data.tr.update(data.R[-1])
-    x = data.tr.challenge()
+    e = data.tr.challenge()
 
-    data.G = data.G[:n]*x.invert() + data.G[n:]*x
-    data.H = data.H[:n]*x + data.H[n:]*x.invert()
+    data.Gi = G1*e.invert() + G2*(e*data.y.invert()**n)
+    data.Hi = H1*e + H2*e.invert()
+    data.P = data.L[-1]*e**2 + data.P + data.R[-1]*e.invert()**2
 
-    data.a = data.a[:n]*x + data.a[n:]*x.invert()
-    data.b = data.b[:n]*x.invert() + data.b[n:]*x
+    data.a = a1*e + a2*data.y**n*e.invert()
+    data.b = b1*e.invert() + b2*e
+    data.alpha = dL*e**2 + data.alpha + dR*e.invert()**2
 
 # Generate a multi-output proof
 #
 # INPUTS
 #   data: list of value/mask pairs (Scalars)
 #   N: number of bits in range (int)
-#   seed: seed for auxiliary data (hashable, optional)
-#   aux: auxiliary data to hide (Scalar, optional)
 # OUTPUTS
 #   Bulletproof
-def prove(data,N,seed=None,aux=None):
-    tr = transcript.Transcript('Bulletproof')
-    M = len(data)
+def prove(data,N):
+    tr = transcript.Transcript('Bulletproof+')
+    M = len(data) # aggregation factor
 
-    # curve points
+    # Curve points
     G = dumb25519.G
     H = hash_to_point('pybullet H')
     Gi = PointVector([hash_to_point('pybullet Gi ' + str(i)) for i in range(M*N)])
     Hi = PointVector([hash_to_point('pybullet Hi ' + str(i)) for i in range(M*N)])
 
-    # set amount commitments
+    one_MN = ScalarVector([Scalar(1) for _ in range(M*N)])
+
+    # Set amount commitments
     V = PointVector([])
     aL = ScalarVector([])
     for v,gamma in data:
-        V.append((H*v + G*gamma)*inv8)
+        V.append(G*v + H*gamma)
         tr.update(V[-1])
         aL.extend(scalar_to_bits(v,N))
 
-    # set bit arrays
-    aR = ScalarVector([])
-    for bit in aL.scalars:
-        aR.append(bit-Scalar(1))
+    # Set offset bit array
+    aR = aL - one_MN
 
-    alpha = random_scalar() if seed is None else hash_to_scalar(seed,V,'alpha') + aux
-    A = (Gi**aL + Hi**aR + G*alpha)*inv8
+    alpha = random_scalar()
+    A = Gi**aL + Hi**aR + H*alpha
 
-    sL = ScalarVector([random_scalar()]*(M*N))
-    sR = ScalarVector([random_scalar()]*(M*N))
-    rho = random_scalar() if seed is None else hash_to_scalar(seed,V,'rho')
-    S = (Gi**sL + Hi**sR + G*rho)*inv8
-
-    # get challenges
+    # Get challenges
     tr.update(A)
-    tr.update(S)
     y = tr.challenge()
     z = tr.challenge()
-    y_inv = y.invert()
 
-    # polynomial coefficients
-    l0 = aL - ScalarVector([z]*(M*N))
-    l1 = sL
-
-    # for polynomial coefficients
-    zeros_twos = []
-    z_cache = z**2
+    d = ScalarVector([])
     for j in range(M):
         for i in range(N):
-            zeros_twos.append(z_cache*2**i)
-        z_cache *= z
+            d.append(z**(2*(j+1))*Scalar(2)**i)
 
-    # more polynomial coefficients
-    r0 = aR + ScalarVector([z]*(M*N))
-    r0 = r0*exp_scalar(y,M*N)
-    r0 += ScalarVector(zeros_twos)
-    r1 = exp_scalar(y,M*N)*sR
+    # Build the proof element incrementally
+    Ahat = A - Gi**(one_MN*z)
+    Ahat += Hi**(d*exp_scalar(y,M*N,desc=True) + one_MN*z)
+    for j in range(M):
+        Ahat += V[j]*(z**(2*(j+1))*y**(M*N+1))
+    Ahat += G*(one_MN**exp_scalar(y,M*N)*z - one_MN**d*y**(M*N+1)*z - one_MN**exp_scalar(y,M*N)*z**2)
+    
+    # Prepare for inner product
+    aL1 = aL - one_MN*z
+    aR1 = aR + d*exp_scalar(y,M*N,desc=True) + one_MN*z
+    alpha1 = alpha
+    for j in range(M):
+        gamma = data[j][1]
+        alpha1 += z**(2*(j+1))*gamma*y**(M*N+1)
 
-    # build the polynomials
-    t0 = l0**r0
-    t1 = l0**r1 + l1**r0
-    t2 = l1**r1
+    # Sanity check on WIP relation
+    if not Ahat == Gi**aL1 + Hi**aR1 + G*wip(aL1,aR1,y) + H*alpha1:
+        raise ArithmeticError('Bad prover relation!')
 
-    tau1 = random_scalar()
-    tau2 = random_scalar()
-    T1 = (H*t1 + G*tau1)*inv8
-    T2 = (H*t2 + G*tau2)*inv8
-
-    tr.update(T1)
-    tr.update(T2)
-    x = tr.challenge()
-
-    taux = tau1*x + tau2*(x**2)
-    for j in range(1,M+1):
-        gamma = data[j-1][1]
-        taux += z**(1+j)*gamma
-    mu = x*rho+alpha
-
-    l = l0 + l1*x
-    r = r0 + r1*x
-    t = l**r
-
-    tr.update(taux)
-    tr.update(mu)
-    tr.update(t)
-    x_ip = tr.challenge()
-
-    L = PointVector([])
-    R = PointVector([])
-   
-    # initial inner product inputs
-    data = InnerProductRound(Gi,PointVector([Hi[i]*(y_inv**i) for i in range(len(Hi))]),H*x_ip,l,r,tr)
+    # Initial inner product inputs
+    data = InnerProductRound(Gi,Hi,G,H,Ahat,aL1,aR1,alpha1,y,tr)
     while True:
         inner_product(data)
 
-        # we have reached the end of the recursion
+        # We have reached the end of the recursion
         if data.done:
-            return Bulletproof(V,A,S,T1,T2,taux,mu,data.L,data.R,data.a,data.b,t,seed)
+            return Bulletproof(V,A,data.A,data.B,data.r1,data.s1,data.d1,data.L,data.R)
 
-# Verify a batch of multi-output proofs
+# Verify a multi-output proof
+# TODO: add batching and efficient verifier!
 #
 # INPUTS
-#   proofs: list of proofs (Bulletproofs)
+#   proof: proofs (Bulletproof)
 #   N: number of bits in range (int)
-# OUTPUTS
-#   auxiliary data list if all proofs are valid
-def verify(proofs,N):
-    # determine the length of the longest proof
-    max_MN = 2**max([len(proof.L) for proof in proofs])
+def verify(proof,N):
+    M = len(proof.V)
 
     # curve points
     Z = dumb25519.Z
     G = dumb25519.G
     H = hash_to_point('pybullet H')
-    Gi = PointVector([hash_to_point('pybullet Gi ' + str(i)) for i in range(max_MN)])
-    Hi = PointVector([hash_to_point('pybullet Hi ' + str(i)) for i in range(max_MN)])
+    Gi = PointVector([hash_to_point('pybullet Gi ' + str(i)) for i in range(M*N)])
+    Hi = PointVector([hash_to_point('pybullet Hi ' + str(i)) for i in range(M*N)])
 
-    # set up weighted aggregates
-    y0 = Scalar(0)
-    y1 = Scalar(0)
-    z1 = Scalar(0)
-    z3 = Scalar(0)
-    z4 = [Scalar(0)]*max_MN
-    z5 = [Scalar(0)]*max_MN
-    scalars = ScalarVector([]) # for final check
-    points = PointVector([]) # for final check
+    one_MN = ScalarVector([Scalar(1) for _ in range(M*N)])
 
-    # store auxiliary data
-    aux = []
+    # Start transcript
+    tr = transcript.Transcript('Bulletproof+')
 
-    # run through each proof
-    for proof in proofs:
-        tr = transcript.Transcript('Bulletproof')
+    for V in proof.V:
+        tr.update(V)
+    tr.update(proof.A)
+    y = tr.challenge()
+    z = tr.challenge()
 
-        V = proof.V
-        A = proof.A
-        S = proof.S
-        T1 = proof.T1
-        T2 = proof.T2
-        taux = proof.taux
-        mu = proof.mu
-        L = proof.L
-        R = proof.R
-        a = proof.a
-        b = proof.b
-        t = proof.t
-        seed = proof.seed
+    # Build the inner product input
+    d = ScalarVector([])
+    for j in range(M):
+        for i in range(N):
+            d.append(z**(2*(j+1))*Scalar(2)**i)
 
-        # get size information
-        M = 2**len(L)/N
+    # Build the proof element incrementally
+    Ahat = proof.A - Gi**(one_MN*z)
+    Ahat += Hi**(d*exp_scalar(y,M*N,desc=True) + one_MN*z)
+    for j in range(M):
+        Ahat += proof.V[j]*(z**(2*(j+1))*y**(M*N+1))
+    Ahat += G*(one_MN**exp_scalar(y,M*N)*z - one_MN**d*y**(M*N+1)*z - one_MN**exp_scalar(y,M*N)*z**2)
 
-        # weighting factors for batching
-        weight_y = random_scalar()
-        weight_z = random_scalar()
-        if weight_y == Scalar(0) or weight_z == Scalar(0):
-            raise ArithmeticError
-
-        # reconstruct challenges
-        for v in V:
-            tr.update(v)
-        tr.update(A)
-        tr.update(S)
-        y = tr.challenge()
-        if y == Scalar(0):
-            raise ArithmeticError
-        y_inv = y.invert()
-        z = tr.challenge()
-        if z == Scalar(0):
-            raise ArithmeticError
-        tr.update(T1)
-        tr.update(T2)
-        x = tr.challenge()
-        if x == Scalar(0):
-            raise ArithmeticError
-        tr.update(taux)
-        tr.update(mu)
-        tr.update(t)
-        x_ip = tr.challenge()
-        if x_ip == Scalar(0):
-            raise ArithmeticError
-
-        # recover auxiliary data if present
-        if seed is not None:
-            aux.append(mu - x*hash_to_scalar(seed,V,'rho') - hash_to_scalar(seed,V,'alpha'))
-        else:
-            aux.append(None)
-
-        y0 += taux*weight_y
+    # Now execute the weighted inner product, the slow way
+    n = M*N
+    j = 0 # to track the rounds
+    while n > 1:
+        n /= 2
+        G1 = Gi[:n]
+        G2 = Gi[n:]
+        H1 = Hi[:n]
+        H2 = Hi[n:]
         
-        k = (z-z**2)*sum_scalar(y,M*N)
-        for j in range(1,M+1):
-            k -= (z**(j+2))*sum_scalar(Scalar(2),N)
+        tr.update(proof.L[j])
+        tr.update(proof.R[j])
+        e = tr.challenge()
 
-        y1 += (t-k)*weight_y
+        Gi = G1*e.invert() + G2*(e*y.invert()**n)
+        Hi = H1*e + H2*e.invert()
+        Ahat += e**2*proof.L[j] + e.invert()**2*proof.R[j]
 
-        for j in range(M):
-            scalars.append(z**(j+2)*weight_y)
-            points.append(V[j]*Scalar(8))
-        scalars.append(x*weight_y)
-        points.append(T1*Scalar(8))
-        scalars.append(x**2*weight_y)
-        points.append(T2*Scalar(8))
+        j += 1
 
-        scalars.append(weight_z)
-        points.append(A*Scalar(8))
-        scalars.append(x*weight_z)
-        points.append(S*Scalar(8))
+    # Final round
+    tr.update(proof.A1)
+    tr.update(proof.B)
+    e = tr.challenge()
 
-        # inner product
-        W = ScalarVector([])
-        for i in range(len(L)):
-            tr.update(L[i])
-            tr.update(R[i])
-            W.append(tr.challenge())
-            if W[i] == Scalar(0):
-                raise ArithmeticError
-        W_inv = W.invert()
-
-        for i in range(M*N):
-            index = i
-            g = a
-            h = b*((y_inv)**i)
-            for j in range(len(L)-1,-1,-1):
-                J = len(W)-j-1
-                base_power = 2**j
-                if index/base_power == 0:
-                    g *= W_inv[J]
-                    h *= W[J]
-                else:
-                    g *= W[J]
-                    h *= W_inv[J]
-                    index -= base_power
-
-            g += z
-            h -= (z*(y**i) + (z**(2+i/N))*(Scalar(2)**(i%N)))*((y_inv)**i)
-
-            z4[i] += g*weight_z
-            z5[i] += h*weight_z
-
-        z1 += mu*weight_z
-
-        for i in range(len(L)):
-            scalars.append(W[i]**2*weight_z)
-            points.append(L[i]*Scalar(8))
-            scalars.append(W_inv[i]**2*weight_z)
-            points.append(R[i]*Scalar(8))
-        z3 += (t-a*b)*x_ip*weight_z
-    
-    # now check all proofs together
-    scalars.append(-y0-z1)
-    points.append(G)
-    scalars.append(-y1+z3)
-    points.append(H)
-    for i in range(max_MN):
-        scalars.append(-z4[i])
-        points.append(Gi[i])
-        scalars.append(-z5[i])
-        points.append(Hi[i])
-
-    if not dumb25519.multiexp(scalars,points) == Z:
-        raise ArithmeticError('Bad verification!')
-
-    return aux
+    LHS = e**2*Ahat + e*proof.A1 + proof.B
+    RHS = (proof.r1*e)*Gi[0] + (proof.s1*e)*Hi[0] + (proof.r1*y*proof.s1)*G + proof.d1*H
+    if not LHS == RHS:
+        raise ArithmeticError('Failed verification!')
