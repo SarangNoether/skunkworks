@@ -1,5 +1,5 @@
 import dumb25519
-from dumb25519 import Scalar, Point, ScalarVector, PointVector, random_scalar, random_point, hash_to_scalar, hash_to_point
+from dumb25519 import Scalar, Point, ScalarVector, PointVector, random_scalar, random_point, hash_to_scalar, hash_to_point, multiexp
 import transcript
 
 inv8 = Scalar(8).invert()
@@ -301,10 +301,11 @@ def verify(proof,N):
         Ahat += proof.V[j]*(z**(2*(j+1))*y**(M*N+1))
     Ahat += G*(one_MN**exp_scalar(y,M*N)*z - one_MN**d*y**(M*N+1)*z - one_MN**exp_scalar(y,M*N)*z**2)
 
-    # Execute the weighted inner product, the faster way
-    LHS = Z
-    RHS = Z
+    # Final multiscalar multiplication data
+    scalars = ScalarVector([])
+    points = PointVector([])
 
+    # Reconstruct challenges
     challenges = ScalarVector([]) # challenges
     for j in range(len(proof.L)):
         tr.update(proof.L[j])
@@ -316,6 +317,8 @@ def verify(proof,N):
     tr.update(proof.A1)
     tr.update(proof.B)
     e = tr.challenge()
+    if e == Scalar(0):
+        raise ArithmeticError('Bad verifier challenge!')
 
     # Aggregate the generator scalars
     for i in range(M*N):
@@ -332,15 +335,29 @@ def verify(proof,N):
                 g *= challenges[J]
                 h *= challenges_inv[J]
                 index -= base_power
-        LHS += Gi[i]*g + Hi[i]*h
+        scalars.append(g)
+        points.append(Gi[i])
+        scalars.append(h)
+        points.append(Hi[i])
 
     # Remaining terms
-    LHS += G*(proof.r1*y*proof.s1) + H*proof.d1
-    RHS += proof.A1*e + proof.B
-    RHS += Ahat*e**2
-    for j in range(len(proof.L)):
-        RHS += proof.L[j]*(e**2*challenges[j]**2)
-        RHS += proof.R[j]*(e**2*challenges_inv[j]**2)
+    scalars.append(proof.r1*y*proof.s1)
+    points.append(G)
+    scalars.append(proof.d1)
+    points.append(H)
 
-    if not LHS == RHS:
+    scalars.append(-e)
+    points.append(proof.A1)
+    scalars.append(-Scalar(1))
+    points.append(proof.B)
+
+    scalars.append(-e**2)
+    points.append(Ahat)
+    for j in range(len(proof.L)):
+        scalars.append(-e**2*challenges[j]**2)
+        points.append(proof.L[j])
+        scalars.append(-e**2*challenges_inv[j]**2)
+        points.append(proof.R[j])
+
+    if not multiexp(scalars,points) == Z:
         raise ArithmeticError('Failed verification!')
