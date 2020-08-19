@@ -47,12 +47,12 @@ class TestBullet(unittest.TestCase):
         data = [[Scalar(random.randint(0,2**N-1)),random_scalar()] for i in range(M)]
         pybullet.verify(pybullet.prove(data,N),N)
 
-#    def test_invalid_value(self):
-#        M = 1
-#        N = 4
-#        data = [[Scalar(random.randint(2**N,2**(N+1)-1)),random_scalar()]]
-#        with self.assertRaises(ArithmeticError):
-#            pybullet.verify(pybullet.prove(data,N),N)
+    def test_invalid_value(self):
+        M = 1
+        N = 4
+        data = [[Scalar(random.randint(2**N,2**(N+1)-1)),random_scalar()]]
+        with self.assertRaises(ArithmeticError):
+            pybullet.verify(pybullet.prove(data,N),N)
 
 for test in [TestBulletOps,TestBullet]:
     unittest.TextTestRunner(verbosity=2,failfast=True).run(unittest.TestLoader().loadTestsFromTestCase(test))
