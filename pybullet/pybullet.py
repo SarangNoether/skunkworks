@@ -282,7 +282,11 @@ def verify(proof,N):
         tr.update(V)
     tr.update(proof.A)
     y = tr.challenge()
+    if y == Scalar(0):
+        raise ArithmeticError('Bad verifier challenge!')
     z = tr.challenge()
+    if z == Scalar(0):
+        raise ArithmeticError('Bad verifier challenge!')
 
     # Build the inner product input
     d = ScalarVector([])
@@ -297,32 +301,46 @@ def verify(proof,N):
         Ahat += proof.V[j]*(z**(2*(j+1))*y**(M*N+1))
     Ahat += G*(one_MN**exp_scalar(y,M*N)*z - one_MN**d*y**(M*N+1)*z - one_MN**exp_scalar(y,M*N)*z**2)
 
-    # Now execute the weighted inner product, the slow way
-    n = M*N
-    j = 0 # to track the rounds
-    while n > 1:
-        n /= 2
-        G1 = Gi[:n]
-        G2 = Gi[n:]
-        H1 = Hi[:n]
-        H2 = Hi[n:]
-        
+    # Execute the weighted inner product, the faster way
+    LHS = Z
+    RHS = Z
+
+    challenges = ScalarVector([]) # challenges
+    for j in range(len(proof.L)):
         tr.update(proof.L[j])
         tr.update(proof.R[j])
-        e = tr.challenge()
-
-        Gi = G1*e.invert() + G2*(e*y.invert()**n)
-        Hi = H1*e + H2*e.invert()
-        Ahat += e**2*proof.L[j] + e.invert()**2*proof.R[j]
-
-        j += 1
-
-    # Final round
+        challenges.append(tr.challenge())
+        if challenges[j] == Scalar(0):
+            raise ArithmeticError('Bad verifier challenge!')
+    challenges_inv = challenges.invert()
     tr.update(proof.A1)
     tr.update(proof.B)
     e = tr.challenge()
 
-    LHS = e**2*Ahat + e*proof.A1 + proof.B
-    RHS = (proof.r1*e)*Gi[0] + (proof.s1*e)*Hi[0] + (proof.r1*y*proof.s1)*G + proof.d1*H
+    # Aggregate the generator scalars
+    for i in range(M*N):
+        index = i
+        g = proof.r1*e*y.invert()**i
+        h = proof.s1*e
+        for j in range(len(proof.L)-1,-1,-1):
+            J = len(challenges)-j-1
+            base_power = 2**j
+            if index/base_power == 0: # rounded down
+                g *= challenges_inv[J]
+                h *= challenges[J]
+            else:
+                g *= challenges[J]
+                h *= challenges_inv[J]
+                index -= base_power
+        LHS += Gi[i]*g + Hi[i]*h
+
+    # Remaining terms
+    LHS += G*(proof.r1*y*proof.s1) + H*proof.d1
+    RHS += proof.A1*e + proof.B
+    RHS += Ahat*e**2
+    for j in range(len(proof.L)):
+        RHS += proof.L[j]*(e**2*challenges[j]**2)
+        RHS += proof.R[j]*(e**2*challenges_inv[j]**2)
+
     if not LHS == RHS:
         raise ArithmeticError('Failed verification!')
