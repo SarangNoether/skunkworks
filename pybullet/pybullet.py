@@ -1,5 +1,5 @@
 import dumb25519
-from dumb25519 import Scalar, Point, ScalarVector, PointVector, random_scalar, random_point, hash_to_scalar, hash_to_point, multiexp
+from dumb25519 import Scalar, ScalarVector, PointVector, random_scalar, hash_to_point, multiexp
 import transcript
 
 inv8 = Scalar(8).invert()
@@ -132,7 +132,7 @@ def inner_product(data):
             raise ArithmeticError('Bad manual verifier!')
 
         return
-    
+
     n /= 2
     a1 = data.a[:n]
     a2 = data.a[n:]
@@ -212,7 +212,7 @@ def prove(data,N):
     for j in range(M):
         Ahat += V[j]*(z**(2*(j+1))*y**(M*N+1))
     Ahat += G*(one_MN**exp_scalar(y,M*N)*z - one_MN**d*y**(M*N+1)*z - one_MN**exp_scalar(y,M*N)*z**2)
-    
+
     # Prepare for inner product
     aL1 = aL - one_MN*z
     aR1 = aR + d*exp_scalar(y,M*N,desc=True) + one_MN*z
@@ -234,104 +234,144 @@ def prove(data,N):
         if data.done:
             return Bulletproof(V,A,data.A,data.B,data.r1,data.s1,data.d1,data.L,data.R)
 
-# Verify a multi-output proof
-# TODO: add batching
+# Verify a batch of multi-output proofs
 #
 # INPUTS
-#   proof: proofs (Bulletproof)
+#   proofs: list of proofs (Bulletproof)
 #   N: number of bits in range (int)
-def verify(proof,N):
-    M = len(proof.V)
+def verify(proofs,N):
+    max_MN = 2**max([len(proof.L) for proof in proofs]) # length of the largest inner product input
 
-    # curve points
-    Z = dumb25519.Z
-    G = dumb25519.G
-    H = hash_to_point('pybullet H')
-    Gi = PointVector([hash_to_point('pybullet Gi ' + str(i)) for i in range(M*N)])
-    Hi = PointVector([hash_to_point('pybullet Hi ' + str(i)) for i in range(M*N)])
-
-    one_MN = ScalarVector([Scalar(1) for _ in range(M*N)])
-
-    # Start transcript
-    tr = transcript.Transcript('Bulletproof+')
-
-    for V in proof.V:
-        tr.update(V)
-    tr.update(proof.A)
-    y = tr.challenge()
-    if y == Scalar(0):
-        raise ArithmeticError('Bad verifier challenge!')
-    z = tr.challenge()
-    if z == Scalar(0):
-        raise ArithmeticError('Bad verifier challenge!')
-
-    # Build the inner product input
-    d = ScalarVector([])
-    for j in range(M):
-        for i in range(N):
-            d.append(z**(2*(j+1))*Scalar(2)**i)
+    # Weighted coefficients for common generators
+    G_scalar = Scalar(0)
+    H_scalar = Scalar(0)
+    Gi_scalars = ScalarVector([Scalar(0)]*max_MN)
+    Hi_scalars = ScalarVector([Scalar(0)]*max_MN)
 
     # Final multiscalar multiplication data
     scalars = ScalarVector([])
     points = PointVector([])
 
-    # Reconstruct challenges
-    challenges = ScalarVector([]) # challenges
-    for j in range(len(proof.L)):
-        tr.update(proof.L[j])
-        tr.update(proof.R[j])
-        challenges.append(tr.challenge())
-        if challenges[j] == Scalar(0):
+    # Curve points
+    Z = dumb25519.Z
+    G = dumb25519.G
+    H = hash_to_point('pybullet H')
+    Gi = PointVector([hash_to_point('pybullet Gi ' + str(i)) for i in range(max_MN)])
+    Hi = PointVector([hash_to_point('pybullet Hi ' + str(i)) for i in range(max_MN)])
+
+    # Process each proof and add it to the batch
+    for proof in proofs:
+        # Sanity checks
+        if not isinstance(proof, Bulletproof):
+            raise TypeError
+
+        V = proof.V
+        A = proof.A
+        A1 = proof.A1
+        B = proof.B
+        r1 = proof.r1
+        s1 = proof.s1
+        d1 = proof.d1
+        L = proof.L
+        R = proof.R
+
+        if not len(L) == len(R):
+            raise IndexError
+        if not 2**len(L) == len(V)*N:
+            raise IndexError
+
+        # Helpful quantities
+        M = len(V)
+        one_MN = ScalarVector([Scalar(1) for _ in range(M*N)])
+
+        # Batch weight
+        weight = random_scalar()
+        if weight == Scalar(0):
+            raise ArithmeticError
+
+        # Start transcript
+        tr = transcript.Transcript('Bulletproof+')
+
+        for V_ in V:
+            tr.update(V_)
+        tr.update(proof.A)
+        y = tr.challenge()
+        if y == Scalar(0):
             raise ArithmeticError('Bad verifier challenge!')
-    challenges_inv = challenges.invert()
-    tr.update(proof.A1)
-    tr.update(proof.B)
-    e = tr.challenge()
-    if e == Scalar(0):
-        raise ArithmeticError('Bad verifier challenge!')
+        z = tr.challenge()
+        if z == Scalar(0):
+            raise ArithmeticError('Bad verifier challenge!')
 
-    # Aggregate the generator scalars
-    for i in range(M*N):
-        index = i
-        g = proof.r1*e*y.invert()**i
-        h = proof.s1*e
-        for j in range(len(proof.L)-1,-1,-1):
-            J = len(challenges)-j-1
-            base_power = 2**j
-            if index/base_power == 0: # rounded down
-                g *= challenges_inv[J]
-                h *= challenges[J]
-            else:
-                g *= challenges[J]
-                h *= challenges_inv[J]
-                index -= base_power
-        scalars.append(g+e**2*z)
-        points.append(Gi[i])
-        scalars.append(h-e**2*(d[i]*y**(M*N-i)+z))
-        points.append(Hi[i])
+        # Build the inner product input
+        d = ScalarVector([])
+        for j in range(M):
+            for i in range(N):
+                d.append(z**(2*(j+1))*Scalar(2)**i)
 
-    # Remaining terms
-    for j in range(len(proof.V)):
-        scalars.append(-e**2*z**(2*(j+1))*y**(M*N+1))
-        points.append(proof.V[j])
+        # Reconstruct challenges
+        challenges = ScalarVector([]) # challenges
+        for j in range(len(L)):
+            tr.update(L[j])
+            tr.update(R[j])
+            challenges.append(tr.challenge())
+            if challenges[j] == Scalar(0):
+                raise ArithmeticError('Bad verifier challenge!')
+        challenges_inv = challenges.invert()
+        tr.update(A1)
+        tr.update(B)
+        e = tr.challenge()
+        if e == Scalar(0):
+            raise ArithmeticError('Bad verifier challenge!')
 
-    scalars.append(proof.r1*y*proof.s1+e**2*(y**(M*N+1)*z*one_MN**d + (z**2-z)*one_MN**exp_scalar(y,M*N)))
+        # Aggregate the generator scalars
+        for i in range(M*N):
+            index = i
+            g = r1*e*y.invert()**i
+            h = s1*e
+            for j in range(len(L)-1,-1,-1):
+                J = len(challenges)-j-1
+                base_power = 2**j
+                if index/base_power == 0: # rounded down
+                    g *= challenges_inv[J]
+                    h *= challenges[J]
+                else:
+                    g *= challenges[J]
+                    h *= challenges_inv[J]
+                    index -= base_power
+            Gi_scalars[i] += weight*(g + e**2*z)
+            Hi_scalars[i] += weight*(h - e**2*(d[i]*y**(M*N-i)+z))
+
+        # Remaining terms
+        for j in range(M):
+            scalars.append(weight*(-e**2*z**(2*(j+1))*y**(M*N+1)))
+            points.append(V[j])
+
+        G_scalar += weight*(r1*y*s1 + e**2*(y**(M*N+1)*z*one_MN**d + (z**2-z)*one_MN**exp_scalar(y,M*N)))
+        H_scalar += weight*d1
+
+        scalars.append(weight*-e)
+        points.append(A1)
+        scalars.append(-weight)
+        points.append(B)
+        scalars.append(weight*-e**2)
+        points.append(A)
+
+        for j in range(len(L)):
+            scalars.append(weight*(-e**2*challenges[j]**2))
+            points.append(L[j])
+            scalars.append(weight*(-e**2*challenges_inv[j]**2))
+            points.append(R[j])
+
+    # Common generators
+    scalars.append(G_scalar)
     points.append(G)
-    scalars.append(proof.d1)
+    scalars.append(H_scalar)
     points.append(H)
-
-    scalars.append(-e)
-    points.append(proof.A1)
-    scalars.append(-Scalar(1))
-    points.append(proof.B)
-    scalars.append(-e**2)
-    points.append(proof.A)
-
-    for j in range(len(proof.L)):
-        scalars.append(-e**2*challenges[j]**2)
-        points.append(proof.L[j])
-        scalars.append(-e**2*challenges_inv[j]**2)
-        points.append(proof.R[j])
+    for i in range(max_MN):
+        scalars.append(Gi_scalars[i])
+        points.append(Gi[i])
+        scalars.append(Hi_scalars[i])
+        points.append(Hi[i])
 
     if not multiexp(scalars,points) == Z:
         raise ArithmeticError('Failed verification!')
