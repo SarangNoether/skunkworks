@@ -120,8 +120,8 @@ def inner_product(data):
         data.A = data.Gi[0]*r + data.Hi[0]*s + data.G*(r*data.y*data.b[0] + s*data.y*data.a[0]) + data.H*d
         data.B = data.G*(r*data.y*s) + data.H*eta
 
-        data.tr.update(data.A)
-        data.tr.update(data.B)
+        data.tr.update(data.A*inv8)
+        data.tr.update(data.B*inv8)
         e = data.tr.challenge()
 
         data.r1 = r + data.a[0]*e
@@ -151,8 +151,8 @@ def inner_product(data):
     data.L.append(G2**(a1*data.y.invert()**n) + H1**b2 + data.G*cL + data.H*dL)
     data.R.append(G1**(a2*data.y**n) + H2**b1 + data.G*cR + data.H*dR)
 
-    data.tr.update(data.L[-1])
-    data.tr.update(data.R[-1])
+    data.tr.update(data.L[-1]*inv8)
+    data.tr.update(data.R[-1]*inv8)
     e = data.tr.challenge()
 
     data.Gi = G1*e.invert() + G2*(e*data.y.invert()**n)
@@ -187,7 +187,7 @@ def prove(data,N):
     aL = ScalarVector([])
     for v,gamma in data:
         V.append(G*v + H*gamma)
-        tr.update(V[-1])
+        tr.update(V[-1]*inv8)
         aL.extend(scalar_to_bits(v,N))
 
     # Set offset bit array
@@ -197,7 +197,7 @@ def prove(data,N):
     A = Gi**aL + Hi**aR + H*alpha
 
     # Get challenges
-    tr.update(A)
+    tr.update(A*inv8)
     y = tr.challenge()
     z = tr.challenge()
 
@@ -232,7 +232,7 @@ def prove(data,N):
 
         # We have reached the end of the recursion
         if data.done:
-            return Bulletproof(V,A,data.A,data.B,data.r1,data.s1,data.d1,data.L,data.R)
+            return Bulletproof([V_*inv8 for V_ in V],A*inv8,data.A*inv8,data.B*inv8,data.r1,data.s1,data.d1,[L*inv8 for L in data.L],[R*inv8 for R in data.R])
 
 # Verify a batch of multi-output proofs
 #
@@ -344,23 +344,23 @@ def verify(proofs,N):
         # Remaining terms
         for j in range(M):
             scalars.append(weight*(-e**2*z**(2*(j+1))*y**(M*N+1)))
-            points.append(V[j])
+            points.append(V[j]*Scalar(8))
 
         G_scalar += weight*(r1*y*s1 + e**2*(y**(M*N+1)*z*one_MN**d + (z**2-z)*one_MN**exp_scalar(y,M*N)))
         H_scalar += weight*d1
 
         scalars.append(weight*-e)
-        points.append(A1)
+        points.append(A1*Scalar(8))
         scalars.append(-weight)
-        points.append(B)
+        points.append(B*Scalar(8))
         scalars.append(weight*-e**2)
-        points.append(A)
+        points.append(A*Scalar(8))
 
         for j in range(len(L)):
             scalars.append(weight*(-e**2*challenges[j]**2))
-            points.append(L[j])
+            points.append(L[j]*Scalar(8))
             scalars.append(weight*(-e**2*challenges_inv[j]**2))
-            points.append(R[j])
+            points.append(R[j]*Scalar(8))
 
     # Common generators
     scalars.append(G_scalar)
