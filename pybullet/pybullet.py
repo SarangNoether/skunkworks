@@ -97,29 +97,6 @@ def exp_scalar(s,l,desc=False):
     else:
         return ScalarVector([s**(i+1) for i in range(l)])
 
-# Sum the powers of a scalar
-#
-# INPUTS
-#   s: (Scalar)
-#   l: number of powers to include (int)
-# OUTPUTS
-#   s^0+s^1+...+s^(l-1) (Scalar)
-def sum_scalar(s,l):
-    if not l & (l-1) == 0:
-        raise ValueError('We need l to be a power of 2!')
-
-    if l == 0:
-        return Scalar(0)
-    if l == 1:
-        return Scalar(1)
-
-    r = Scalar(1) + s
-    while l > 2:
-        s = s*s
-        r += s*r
-        l /= 2
-    return r
-
 # Perform an inner-product proof round
 #
 # INPUTS
@@ -258,7 +235,7 @@ def prove(data,N):
             return Bulletproof(V,A,data.A,data.B,data.r1,data.s1,data.d1,data.L,data.R)
 
 # Verify a multi-output proof
-# TODO: add batching and efficient verifier!
+# TODO: add batching
 #
 # INPUTS
 #   proof: proofs (Bulletproof)
@@ -294,13 +271,6 @@ def verify(proof,N):
         for i in range(N):
             d.append(z**(2*(j+1))*Scalar(2)**i)
 
-    # Build the proof element incrementally
-    Ahat = proof.A - Gi**(one_MN*z)
-    Ahat += Hi**(d*exp_scalar(y,M*N,desc=True) + one_MN*z)
-    for j in range(M):
-        Ahat += proof.V[j]*(z**(2*(j+1))*y**(M*N+1))
-    Ahat += G*(one_MN**exp_scalar(y,M*N)*z - one_MN**d*y**(M*N+1)*z - one_MN**exp_scalar(y,M*N)*z**2)
-
     # Final multiscalar multiplication data
     scalars = ScalarVector([])
     points = PointVector([])
@@ -335,13 +305,17 @@ def verify(proof,N):
                 g *= challenges[J]
                 h *= challenges_inv[J]
                 index -= base_power
-        scalars.append(g)
+        scalars.append(g+e**2*z)
         points.append(Gi[i])
-        scalars.append(h)
+        scalars.append(h-e**2*(d[i]*y**(M*N-i)+z))
         points.append(Hi[i])
 
     # Remaining terms
-    scalars.append(proof.r1*y*proof.s1)
+    for j in range(len(proof.V)):
+        scalars.append(-e**2*z**(2*(j+1))*y**(M*N+1))
+        points.append(proof.V[j])
+
+    scalars.append(proof.r1*y*proof.s1+e**2*(y**(M*N+1)*z*one_MN**d + (z**2-z)*one_MN**exp_scalar(y,M*N)))
     points.append(G)
     scalars.append(proof.d1)
     points.append(H)
@@ -350,9 +324,9 @@ def verify(proof,N):
     points.append(proof.A1)
     scalars.append(-Scalar(1))
     points.append(proof.B)
-
     scalars.append(-e**2)
-    points.append(Ahat)
+    points.append(proof.A)
+
     for j in range(len(proof.L)):
         scalars.append(-e**2*challenges[j]**2)
         points.append(proof.L[j])

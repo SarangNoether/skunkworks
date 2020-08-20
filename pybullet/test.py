@@ -21,19 +21,6 @@ class TestBulletOps(unittest.TestCase):
 
             self.assertEqual(len(bits),N)
 
-    def test_sum_scalar(self):
-        # test correctness
-        for s in [Scalar(0),Scalar(1),Scalar(2),Scalar(3)]:
-            for l in [0,1,2,4,8]:
-                result = Scalar(0)
-                for i in range(l):
-                    result += s**i
-                self.assertEqual(result,pybullet.sum_scalar(s,l))
-
-        # fail if l is not a power of 2
-        with self.assertRaises(ValueError):
-            pybullet.sum_scalar(Scalar(1),3)
-
 class TestBullet(unittest.TestCase):
     def test_prove_verify_m_1_n_4(self):
         M = 1
