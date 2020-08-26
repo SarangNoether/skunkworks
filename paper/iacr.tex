@@ -520,7 +520,7 @@ Further, assume each $M_{l_u,0}$ comes equipped with an amount commitment of the
 
 The user generates $W$ auxiliary commitments $P'_u \equiv \com(a_u,s'_u)$ to the same amounts, but with different masks $\{s'_u\}$ chosen uniformly at random from $\F$.
 Then, the user generates $W$ spend proofs, each using the following prover inputs for $u \in [0,W)$:
-$$\mathcal{P}_{par}(\{M_{i,\alpha}\},r_u^{-1}U;(l_u,\{r_u,s_u-s'_u\}))$$
+$$\mathcal{P}_{par}(\{M_{k,0}\}_{k=0}^{N-1},\{M_{k,1}-P'_u\}_{k=0}^{N-1},r_u^{-1}U;(l_u,r_u,s_u-s'_u))$$
 
 For $j \in [0,T)$, the user generates a fresh output of the form $Q_j \equiv \com(b_j,t_j)$ for amount $b_j$ and mask $t_j$.
 The masks are chosen such that for $j \in [1,T)$, we have $t_j$ chosen uniformly at random from $\F$.
