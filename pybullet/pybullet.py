@@ -105,7 +105,7 @@ def inner_product(data):
     n = len(data.Gi)
 
     # Sanity check
-    if not data.P == data.Gi**data.a + data.Hi**data.b + data.G*wip(data.a,data.b,data.y) + data.H*data.alpha:
+    if not data.P == data.Gi**data.a + data.Hi**data.b + data.H*wip(data.a,data.b,data.y) + data.G*data.alpha:
         raise ArithmeticError('Bad prover round!')
 
     if n == 1:
@@ -117,8 +117,8 @@ def inner_product(data):
         d = random_scalar()
         eta = random_scalar()
 
-        data.A = data.Gi[0]*r + data.Hi[0]*s + data.G*(r*data.y*data.b[0] + s*data.y*data.a[0]) + data.H*d
-        data.B = data.G*(r*data.y*s) + data.H*eta
+        data.A = data.Gi[0]*r + data.Hi[0]*s + data.H*(r*data.y*data.b[0] + s*data.y*data.a[0]) + data.G*d
+        data.B = data.H*(r*data.y*s) + data.G*eta
 
         data.tr.update(data.A*inv8)
         data.tr.update(data.B*inv8)
@@ -128,7 +128,7 @@ def inner_product(data):
         data.s1 = s + data.b[0]*e
         data.d1 = eta + d*e + data.alpha*e**2
 
-        if not data.P*e**2 + data.A*e + data.B == data.Gi[0]*(data.r1*e) + data.Hi[0]*(data.s1*e) + data.G*(data.r1*data.y*data.s1) + data.H*data.d1:
+        if not data.P*e**2 + data.A*e + data.B == data.Gi[0]*(data.r1*e) + data.Hi[0]*(data.s1*e) + data.H*(data.r1*data.y*data.s1) + data.G*data.d1:
             raise ArithmeticError('Bad manual verifier!')
 
         return
@@ -148,8 +148,8 @@ def inner_product(data):
 
     cL = wip(a1,b2,data.y)
     cR = wip(a2*data.y**n,b1,data.y)
-    data.L.append(G2**(a1*data.y.invert()**n) + H1**b2 + data.G*cL + data.H*dL)
-    data.R.append(G1**(a2*data.y**n) + H2**b1 + data.G*cR + data.H*dR)
+    data.L.append(G2**(a1*data.y.invert()**n) + H1**b2 + data.H*cL + data.G*dL)
+    data.R.append(G1**(a2*data.y**n) + H2**b1 + data.H*cR + data.G*dR)
 
     data.tr.update(data.L[-1]*inv8)
     data.tr.update(data.R[-1]*inv8)
@@ -186,7 +186,7 @@ def prove(data,N):
     V = PointVector([])
     aL = ScalarVector([])
     for v,gamma in data:
-        V.append(G*v + H*gamma)
+        V.append(H*v + G*gamma)
         tr.update(V[-1]*inv8)
         aL.extend(scalar_to_bits(v,N))
 
@@ -194,7 +194,7 @@ def prove(data,N):
     aR = aL - one_MN
 
     alpha = random_scalar()
-    A = Gi**aL + Hi**aR + H*alpha
+    A = Gi**aL + Hi**aR + G*alpha
 
     # Get challenges
     tr.update(A*inv8)
@@ -211,7 +211,7 @@ def prove(data,N):
     Ahat += Hi**(d*exp_scalar(y,M*N,desc=True) + one_MN*z)
     for j in range(M):
         Ahat += V[j]*(z**(2*(j+1))*y**(M*N+1))
-    Ahat += G*(one_MN**exp_scalar(y,M*N)*z - one_MN**d*y**(M*N+1)*z - one_MN**exp_scalar(y,M*N)*z**2)
+    Ahat += H*(one_MN**exp_scalar(y,M*N)*z - one_MN**d*y**(M*N+1)*z - one_MN**exp_scalar(y,M*N)*z**2)
 
     # Prepare for inner product
     aL1 = aL - one_MN*z
@@ -222,7 +222,7 @@ def prove(data,N):
         alpha1 += z**(2*(j+1))*gamma*y**(M*N+1)
 
     # Sanity check on WIP relation
-    if not Ahat == Gi**aL1 + Hi**aR1 + G*wip(aL1,aR1,y) + H*alpha1:
+    if not Ahat == Gi**aL1 + Hi**aR1 + H*wip(aL1,aR1,y) + G*alpha1:
         raise ArithmeticError('Bad prover relation!')
 
     # Initial inner product inputs
@@ -346,8 +346,8 @@ def verify(proofs,N):
             scalars.append(weight*(-e**2*z**(2*(j+1))*y**(M*N+1)))
             points.append(V[j]*Scalar(8))
 
-        G_scalar += weight*(r1*y*s1 + e**2*(y**(M*N+1)*z*one_MN**d + (z**2-z)*one_MN**exp_scalar(y,M*N)))
-        H_scalar += weight*d1
+        H_scalar += weight*(r1*y*s1 + e**2*(y**(M*N+1)*z*one_MN**d + (z**2-z)*one_MN**exp_scalar(y,M*N)))
+        G_scalar += weight*d1
 
         scalars.append(weight*-e)
         points.append(A1*Scalar(8))
