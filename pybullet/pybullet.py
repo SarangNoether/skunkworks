@@ -25,7 +25,6 @@ class InnerProductRound:
         self.Hi = Hi
         self.G = G
         self.H = H
-        self.P = P
         self.y = y
         self.done = False
 
@@ -104,10 +103,6 @@ def exp_scalar(s,l,desc=False):
 def inner_product(data):
     n = len(data.Gi)
 
-    # Sanity check
-    if not data.P == data.Gi**data.a + data.Hi**data.b + data.H*wip(data.a,data.b,data.y) + data.G*data.alpha:
-        raise ArithmeticError('Bad prover round!')
-
     if n == 1:
         data.done = True
 
@@ -117,19 +112,16 @@ def inner_product(data):
         d = random_scalar()
         eta = random_scalar()
 
-        data.A = data.Gi[0]*r + data.Hi[0]*s + data.H*(r*data.y*data.b[0] + s*data.y*data.a[0]) + data.G*d
-        data.B = data.H*(r*data.y*s) + data.G*eta
+        data.A = (data.Gi[0]*r + data.Hi[0]*s + data.H*(r*data.y*data.b[0] + s*data.y*data.a[0]) + data.G*d)*inv8
+        data.B = (data.H*(r*data.y*s) + data.G*eta)*inv8
 
-        data.tr.update(data.A*inv8)
-        data.tr.update(data.B*inv8)
+        data.tr.update(data.A)
+        data.tr.update(data.B)
         e = data.tr.challenge()
 
         data.r1 = r + data.a[0]*e
         data.s1 = s + data.b[0]*e
         data.d1 = eta + d*e + data.alpha*e**2
-
-        if not data.P*e**2 + data.A*e + data.B == data.Gi[0]*(data.r1*e) + data.Hi[0]*(data.s1*e) + data.H*(data.r1*data.y*data.s1) + data.G*data.d1:
-            raise ArithmeticError('Bad manual verifier!')
 
         return
 
@@ -148,16 +140,15 @@ def inner_product(data):
 
     cL = wip(a1,b2,data.y)
     cR = wip(a2*data.y**n,b1,data.y)
-    data.L.append(G2**(a1*data.y.invert()**n) + H1**b2 + data.H*cL + data.G*dL)
-    data.R.append(G1**(a2*data.y**n) + H2**b1 + data.H*cR + data.G*dR)
+    data.L.append((G2**(a1*data.y.invert()**n) + H1**b2 + data.H*cL + data.G*dL)*inv8)
+    data.R.append((G1**(a2*data.y**n) + H2**b1 + data.H*cR + data.G*dR)*inv8)
 
-    data.tr.update(data.L[-1]*inv8)
-    data.tr.update(data.R[-1]*inv8)
+    data.tr.update(data.L[-1])
+    data.tr.update(data.R[-1])
     e = data.tr.challenge()
 
     data.Gi = G1*e.invert() + G2*(e*data.y.invert()**n)
     data.Hi = H1*e + H2*e.invert()
-    data.P = data.L[-1]*e**2 + data.P + data.R[-1]*e.invert()**2
 
     data.a = a1*e + a2*data.y**n*e.invert()
     data.b = b1*e.invert() + b2*e
@@ -186,18 +177,18 @@ def prove(data,N):
     V = PointVector([])
     aL = ScalarVector([])
     for v,gamma in data:
-        V.append(H*v + G*gamma)
-        tr.update(V[-1]*inv8)
+        V.append((H*v + G*gamma)*inv8)
+        tr.update(V[-1])
         aL.extend(scalar_to_bits(v,N))
 
     # Set offset bit array
     aR = aL - one_MN
 
     alpha = random_scalar()
-    A = Gi**aL + Hi**aR + G*alpha
+    A = (Gi**aL + Hi**aR + G*alpha)*inv8
 
     # Get challenges
-    tr.update(A*inv8)
+    tr.update(A)
     y = tr.challenge()
     z = tr.challenge()
 
@@ -207,10 +198,10 @@ def prove(data,N):
             d.append(z**(2*(j+1))*Scalar(2)**i)
 
     # Build the proof element incrementally
-    Ahat = A - Gi**(one_MN*z)
+    Ahat = A*Scalar(8) - Gi**(one_MN*z)
     Ahat += Hi**(d*exp_scalar(y,M*N,desc=True) + one_MN*z)
     for j in range(M):
-        Ahat += V[j]*(z**(2*(j+1))*y**(M*N+1))
+        Ahat += V[j]*Scalar(8)*(z**(2*(j+1))*y**(M*N+1))
     Ahat += H*(one_MN**exp_scalar(y,M*N)*z - one_MN**d*y**(M*N+1)*z - one_MN**exp_scalar(y,M*N)*z**2)
 
     # Prepare for inner product
@@ -221,10 +212,6 @@ def prove(data,N):
         gamma = data[j][1]
         alpha1 += z**(2*(j+1))*gamma*y**(M*N+1)
 
-    # Sanity check on WIP relation
-    if not Ahat == Gi**aL1 + Hi**aR1 + H*wip(aL1,aR1,y) + G*alpha1:
-        raise ArithmeticError('Bad prover relation!')
-
     # Initial inner product inputs
     data = InnerProductRound(Gi,Hi,G,H,Ahat,aL1,aR1,alpha1,y,tr)
     while True:
@@ -232,7 +219,7 @@ def prove(data,N):
 
         # We have reached the end of the recursion
         if data.done:
-            return Bulletproof([V_*inv8 for V_ in V],A*inv8,data.A*inv8,data.B*inv8,data.r1,data.s1,data.d1,[L*inv8 for L in data.L],[R*inv8 for R in data.R])
+            return Bulletproof(V,A,data.A,data.B,data.r1,data.s1,data.d1,data.L,data.R)
 
 # Verify a batch of multi-output proofs
 #
