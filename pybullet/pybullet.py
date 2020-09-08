@@ -6,7 +6,7 @@ inv8 = Scalar(8).invert()
 
 # Proof structure
 class Bulletproof:
-    def __init__(self,V,A,S,T1,T2,taux,mu,L,R,a,b,t,seed):
+    def __init__(self,V,A,S,T1,T2,taux,mu,L,R,a,b,t,seed,gammas):
         self.V = V
         self.A = A
         self.S = S
@@ -19,7 +19,10 @@ class Bulletproof:
         self.a = a
         self.b = b
         self.t = t
-        self.seed = seed # NOTE: included here for convenience, but not public data
+
+        # NOTE: not public data; here for convenience only
+        self.seed = seed
+        self.gammas = gammas
 
 # Data for a round of the inner product argument
 class InnerProductRound:
@@ -151,7 +154,7 @@ def prove(data,N,seed=None,aux=None):
     for bit in aL.scalars:
         aR.append(bit-Scalar(1))
 
-    alpha = random_scalar() if seed is None else hash_to_scalar(seed,V,'alpha') + aux
+    alpha = random_scalar() if seed is None else hash_to_scalar(seed,V,'alpha') + aux[0]
     A = (Gi**aL + Hi**aR + G*alpha)*inv8
 
     sL = ScalarVector([random_scalar()]*(M*N))
@@ -189,8 +192,8 @@ def prove(data,N,seed=None,aux=None):
     t1 = l0**r1 + l1**r0
     t2 = l1**r1
 
-    tau1 = random_scalar()
-    tau2 = random_scalar()
+    tau1 = random_scalar() if seed is None else hash_to_scalar(seed,V,A,S,'tau1') + aux[1]
+    tau2 = random_scalar() if seed is None else hash_to_scalar(seed,V,A,S,'tau2')
     T1 = (H*t1 + G*tau1)*inv8
     T2 = (H*t2 + G*tau2)*inv8
 
@@ -217,13 +220,13 @@ def prove(data,N,seed=None,aux=None):
     R = PointVector([])
    
     # initial inner product inputs
-    data = InnerProductRound(Gi,PointVector([Hi[i]*(y_inv**i) for i in range(len(Hi))]),H*x_ip,l,r,tr)
+    ip_data = InnerProductRound(Gi,PointVector([Hi[i]*(y_inv**i) for i in range(len(Hi))]),H*x_ip,l,r,tr)
     while True:
-        inner_product(data)
+        inner_product(ip_data)
 
         # we have reached the end of the recursion
-        if data.done:
-            return Bulletproof(V,A,S,T1,T2,taux,mu,data.L,data.R,data.a,data.b,t,seed)
+        if ip_data.done:
+            return Bulletproof(V,A,S,T1,T2,taux,mu,ip_data.L,ip_data.R,ip_data.a,ip_data.b,t,seed,[datum[1] for datum in data])
 
 # Verify a batch of multi-output proofs
 #
@@ -273,6 +276,7 @@ def verify(proofs,N):
         b = proof.b
         t = proof.t
         seed = proof.seed
+        gammas = proof.gammas
 
         # get size information
         M = 2**len(L)/N
@@ -309,7 +313,12 @@ def verify(proofs,N):
 
         # recover auxiliary data if present
         if seed is not None:
-            aux.append(mu - x*hash_to_scalar(seed,V,'rho') - hash_to_scalar(seed,V,'alpha'))
+            aux1 = mu - x*hash_to_scalar(seed,V,'rho') - hash_to_scalar(seed,V,'alpha')
+            aux2 = taux - x*hash_to_scalar(seed,V,A,S,'tau1') - x**2*hash_to_scalar(seed,V,A,S,'tau2')
+            for j in range(1,M+1):
+                aux2 -= z**(1+j)*gammas[j-1]
+            aux2 *= x.invert()
+            aux.append([aux1,aux2])
         else:
             aux.append(None)
 
