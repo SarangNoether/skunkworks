@@ -1,12 +1,12 @@
 import dumb25519
-from dumb25519 import Scalar, ScalarVector, PointVector, random_scalar, hash_to_point, multiexp
+from dumb25519 import Scalar, ScalarVector, PointVector, random_scalar, hash_to_point, hash_to_scalar, multiexp
 import transcript
 
 inv8 = Scalar(8).invert()
 
 # Proof structure
 class Bulletproof:
-    def __init__(self,V,A,A1,B,r1,s1,d1,L,R):
+    def __init__(self,V,A,A1,B,r1,s1,d1,L,R,seed,gammas):
         self.V = V
         self.A = A
         self.A1 = A1
@@ -17,9 +17,13 @@ class Bulletproof:
         self.L = L
         self.R = R
 
+        # NOTE: not public data; here for convenience only
+        self.seed = seed
+        self.gammas = gammas
+
 # Data for a round of the inner product argument
 class InnerProductRound:
-    def __init__(self,Gi,Hi,G,H,P,a,b,alpha,y,tr):
+    def __init__(self,Gi,Hi,G,H,P,a,b,alpha,y,tr,seed):
         # Common data
         self.Gi = Gi
         self.Hi = Hi
@@ -27,6 +31,7 @@ class InnerProductRound:
         self.H = H
         self.y = y
         self.done = False
+        self.round = 0 # round count
 
         # Prover data
         self.a = a
@@ -44,6 +49,9 @@ class InnerProductRound:
 
         # Transcript
         self.tr = tr
+
+        # Seed for auxiliary data embedding
+        self.seed = seed
 
 # Compute a weighted inner product
 #
@@ -109,8 +117,8 @@ def inner_product(data):
         # Random masks
         r = random_scalar()
         s = random_scalar()
-        d = random_scalar()
-        eta = random_scalar()
+        d = random_scalar() if data.seed is None else hash_to_scalar(data.seed,'d')
+        eta = random_scalar() if data.seed is None else hash_to_scalar(data.seed,'eta')
 
         data.A = (data.Gi[0]*r + data.Hi[0]*s + data.H*(r*data.y*data.b[0] + s*data.y*data.a[0]) + data.G*d)*inv8
         data.B = (data.H*(r*data.y*s) + data.G*eta)*inv8
@@ -135,8 +143,8 @@ def inner_product(data):
     H1 = data.Hi[:n]
     H2 = data.Hi[n:]
 
-    dL = random_scalar()
-    dR = random_scalar()
+    dL = random_scalar() if data.seed is None else hash_to_scalar(data.seed,'dL',data.round)
+    dR = random_scalar() if data.seed is None else hash_to_scalar(data.seed,'dR',data.round)
 
     cL = wip(a1,b2,data.y)
     cR = wip(a2*data.y**n,b1,data.y)
@@ -154,14 +162,18 @@ def inner_product(data):
     data.b = b1*e.invert() + b2*e
     data.alpha = dL*e**2 + data.alpha + dR*e.invert()**2
 
+    data.round += 1
+
 # Generate a multi-output proof
 #
 # INPUTS
 #   data: list of value/mask pairs (Scalars)
 #   N: number of bits in range (int)
+#   seed: seed for auxiliary data (hashable, optional)
+#   aux: auxiliary data to embed (Scalar, optional)
 # OUTPUTS
 #   Bulletproof
-def prove(data,N):
+def prove(data,N,seed=None,aux=None):
     tr = transcript.Transcript('Bulletproof+')
     M = len(data) # aggregation factor
 
@@ -184,7 +196,7 @@ def prove(data,N):
     # Set offset bit array
     aR = aL - one_MN
 
-    alpha = random_scalar()
+    alpha = random_scalar() if seed is None else hash_to_scalar(seed,V,'alpha') + aux
     A = (Gi**aL + Hi**aR + G*alpha)*inv8
 
     # Get challenges
@@ -213,19 +225,21 @@ def prove(data,N):
         alpha1 += z**(2*(j+1))*gamma*y**(M*N+1)
 
     # Initial inner product inputs
-    data = InnerProductRound(Gi,Hi,G,H,Ahat,aL1,aR1,alpha1,y,tr)
+    ip_data = InnerProductRound(Gi,Hi,G,H,Ahat,aL1,aR1,alpha1,y,tr,seed)
     while True:
-        inner_product(data)
+        inner_product(ip_data)
 
         # We have reached the end of the recursion
-        if data.done:
-            return Bulletproof(V,A,data.A,data.B,data.r1,data.s1,data.d1,data.L,data.R)
+        if ip_data.done:
+            return Bulletproof(V,A,ip_data.A,ip_data.B,ip_data.r1,ip_data.s1,ip_data.d1,ip_data.L,ip_data.R,seed,[datum[1] for datum in data])
 
 # Verify a batch of multi-output proofs
 #
 # INPUTS
 #   proofs: list of proofs (Bulletproof)
 #   N: number of bits in range (int)
+# OUTPUTS
+#   auxiliary data if all proofs are valid
 def verify(proofs,N):
     max_MN = 2**max([len(proof.L) for proof in proofs]) # length of the largest inner product input
 
@@ -246,6 +260,9 @@ def verify(proofs,N):
     Gi = PointVector([hash_to_point('pybullet Gi ' + str(i)) for i in range(max_MN)])
     Hi = PointVector([hash_to_point('pybullet Hi ' + str(i)) for i in range(max_MN)])
 
+    # Store auxiliary data
+    aux = []
+
     # Process each proof and add it to the batch
     for proof in proofs:
         # Sanity checks
@@ -261,6 +278,8 @@ def verify(proofs,N):
         d1 = proof.d1
         L = proof.L
         R = proof.R
+        seed = proof.seed
+        gammas = proof.gammas
 
         if not len(L) == len(R):
             raise IndexError
@@ -279,6 +298,7 @@ def verify(proofs,N):
         # Start transcript
         tr = transcript.Transcript('Bulletproof+')
 
+        # Reconstruct challenges
         for V_ in V:
             tr.update(V_)
         tr.update(proof.A)
@@ -289,7 +309,7 @@ def verify(proofs,N):
         if z == Scalar(0):
             raise ArithmeticError('Bad verifier challenge!')
 
-        # Build the inner product input
+        # Start preparing data
         d = ScalarVector([])
         for j in range(M):
             for i in range(N):
@@ -309,6 +329,23 @@ def verify(proofs,N):
         e = tr.challenge()
         if e == Scalar(0):
             raise ArithmeticError('Bad verifier challenge!')
+
+        # Recover auxiliary data if present
+        if seed is not None and gammas is not None:
+            aux.append(d1 - hash_to_scalar(seed,'eta') - e*hash_to_scalar(seed,'d'))
+
+            temp = Scalar(0)
+            for j in range(len(challenges)):
+                temp += hash_to_scalar(seed,'dL',j)*challenges[j]**2 + hash_to_scalar(seed,'dR',j)*challenges_inv[j]**2
+            aux[-1] -= e**2*temp
+            aux[-1] -= e**2*hash_to_scalar(seed,V,'alpha')
+            
+            temp = Scalar(0)
+            for j in range(1,len(gammas)+1):
+                temp += z**(2*j)*gammas[j-1]
+            aux[-1] -= e**2*y**(M*N+1)*temp
+
+            aux[-1] *= e.invert()**2
 
         # Aggregate the generator scalars
         for i in range(M*N):
@@ -362,3 +399,5 @@ def verify(proofs,N):
 
     if not multiexp(scalars,points) == Z:
         raise ArithmeticError('Failed verification!')
+    
+    return aux
