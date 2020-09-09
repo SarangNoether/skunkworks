@@ -314,10 +314,12 @@ def verify(proofs,N):
         # recover auxiliary data if present
         if seed is not None:
             aux1 = mu - x*hash_to_scalar(seed,V,'rho') - hash_to_scalar(seed,V,'alpha')
-            aux2 = taux - x*hash_to_scalar(seed,V,A,S,'tau1') - x**2*hash_to_scalar(seed,V,A,S,'tau2')
-            for j in range(1,M+1):
-                aux2 -= z**(1+j)*gammas[j-1]
-            aux2 *= x.invert()
+            aux2 = None
+            if gammas is not None:
+                aux2 = taux - x*hash_to_scalar(seed,V,A,S,'tau1') - x**2*hash_to_scalar(seed,V,A,S,'tau2')
+                for j in range(1,M+1):
+                    aux2 -= z**(1+j)*gammas[j-1]
+                aux2 *= x.invert()
             aux.append([aux1,aux2])
         else:
             aux.append(None)
