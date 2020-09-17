@@ -234,8 +234,38 @@ The proof proceeds similarly to that of \cite{triptych}, which in turn follows t
 
 To show the protocol is perfectly complete, suppose a verifier receives an honest proof.
 We wish to show that all verifier equations hold.
-Equation \ref{eqn:ab} holds from the identity $$\sumi \sigma_{j,i}^{(u)} = 1$$ for all $0 \leq j < m$ and $0 \leq u > w$.
-Similarly, Equation \ref{eqn:cd} holds from the identity $$(\sigma_{j,i}^{(u)})^2 = \sigma_{j,i}^{(u)}$$ for all $0 \leq i < n$ and $0 \leq j < m$ and $0 \leq u < w$.
+
+To show that Equation \ref{eqn:ab} holds, observe that since
+\begin{eqnarray*}
+A + \xi B &=& \com(a + \xi\sigma,r_A + \xi r_B) \\
+&=& \com(a + \xi\sigma,z_A),
+\end{eqnarray*}
+it suffices to show that $f_{j,i}^{(u)} = a_{j,i}^{(u)} + \xi\sigma_{j,i}^{(u)}$ for all $0 \leq i < n$ and $0 \leq j < m$ and $0 \leq u < w$.
+If $i \neq 0$, then this equation holds by definition of $f_{j,i}^{(u)}$.
+The case $i = 0$ proceeds differently.
+To show it, we will use the fact that $$\sumi \sigma_{j,i}^{(u)} = 1$$ for all $0 \leq j < m$ and $0 \leq u < w$ by construction:
+\begin{eqnarray*}
+f_{j,0}^{(u)} &=& \xi - \sum_{i=1}^{n-1} f_{j,i}^{(u)} \\
+&=& \xi - \sum_{i=1}^{n-1} \left( a_{j,i}^{(u)} + \xi\sigma_{j,i}^{(u)} \right) \\
+&=& \xi - \sum_{i=1}^{n-1} a_{j,i}^{(u)} - \xi\sum_{i=1}^{n-1} \sigma_{j,i}^{(u)} \\
+&=& \xi + a_{j,0}^{(u)} - \xi\left( 1 - \sigma_{j,0}^{(u)} \right) \\
+&=& a_{j,0}^{(u)} + \xi\sigma_{j,0}^{(u)}
+\end{eqnarray*}
+
+We now show that Equation \ref{eqn:cd} holds.
+Since
+\begin{eqnarray*}
+\xi C + D &=& \com(\xi a(1 - 2\sigma) - a^2,\xi r_C + r_D) \\
+&=& \com(\xi a(1 - 2\sigma) - a^2,z_C),
+\end{eqnarray*}
+it suffices to show that $$f_{j,i}^{(u)}\left( \xi - f_{j,i}^{(u)} \right) = \xi a_{j,i}^{(u)}\left( 1 - 2\sigma_{j,i}^{(u)} \right) - \left(a_{j,i}^{(u)}\right)^2$$ for all $0 \leq i < n$ and $0 \leq j < m$ and $0 \leq u < w$.
+We use our previous work and the fact that each $\left(\sigma_{j,i}^{(u)}\right)^2 = \sigma_{j,i}^{(u)}$ since $\sigma_{j,i}^{(u)} \in \{0,1\}$:
+\begin{eqnarray*}
+f_{j,i}^{(u)}\left( \xi - f_{j,i}^{(u)} \right) &=& \left( a_{j,i}^{(u)} + \xi\sigma_{j,i}^{(u)} \right)\left( \xi - a_{j,i}^{(u)} - \xi\sigma_{j,i}^{(u)} \right) \\
+&=& a_{j,i}^{(u)}\xi - \left(a_{j,i}^{(u)}\right)^2 - 2a_{j,i}^{(u)}\xi\sigma_{j,i}^{(u)} + \left( \xi^2\sigma_{j,i}^{(u)} - \xi^2\left(\sigma_{j,i}^{(u)}\right)^2 \right) \\
+&=& a_{j,i}^{(u)}\xi - \left(a_{j,i}^{(u)}\right)^2 - 2a_{j,i}^{(u)}\xi\sigma_{j,i}^{(u)} + \left( \xi^2\left(\sigma_{j,i}^{(u)}\right)^2 - \xi^2\left(\sigma_{j,i}^{(u)}\right)^2 \right) \\
+&=& \xi a_{j,i}^{(u)}\left( 1 - 2\sigma_{j,i}^{(u)} \right) - \left(a_{j,i}^{(u)}\right)^2
+\end{eqnarray*}
 
 Next, we show that Equation \ref{eqn:x} holds:
 \begin{eqnarray*}
