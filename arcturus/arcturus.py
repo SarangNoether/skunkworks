@@ -1,6 +1,7 @@
 # Proof-of-concept implementation of https://github.com/monero-project/research-lab/issues/56
 
 from dumb25519 import hash_to_point, random_scalar, Scalar, hash_to_scalar, G, random_point, Z
+from dumb25519 import ScalarVector, PointVector
 import dumb25519
 import random
 import transcript
@@ -196,13 +197,13 @@ def prove(M,P,Q,l,r,s,t,a,b,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
     X = [dumb25519.Z for _ in range(m)]
     Y = [dumb25519.Z for _ in range(m)]
     Z = [dumb25519.Z for _ in range(m)]
-    mu = [hash_to_scalar(i,M,P,Q,J,A,B,C,D) for i in range(N)] # aggregation coefficients
+    mu = hash_to_scalar('Arcturus mu',M,P,Q,J,A,B,C,D)
     rho_R = [[random_scalar() for _ in range(m)] for _ in range(w)]
     rho_S = [[random_scalar() for _ in range(m)] for _ in range(w)]
     for j in range(m):
         for i in range(N):
-            X[j] += M[i]*p[0][i][j]*mu[i]
-            Y[j] += U*p[0][i][j]*mu[i]
+            X[j] += M[i]*p[0][i][j]*mu**i
+            Y[j] += U*p[0][i][j]*mu**i
             Z[j] += P[i]*p[0][i][j]
         for u in range(w):
             X[j] += rho_R[u][j]*G
@@ -246,7 +247,7 @@ def prove(M,P,Q,l,r,s,t,a,b,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
     zR = []
     zS = Scalar(0)
     for u in range(w):
-        zR.append(mu[l[u]]*r[u]*x**m)
+        zR.append(mu**l[u]*r[u]*x**m)
         zS += s[u]*x**m
     for j in range(m):
         for u in range(w):
@@ -313,70 +314,105 @@ def verify(M,P,Q,proof,m):
     tr.update(Z)
     x = tr.challenge()
 
-    # Reconstruct matrix
-    for j in range(m):
-        for u in range(w):
-            f[u][j][0] = x
-            for i in range(1,n):
-                f[u][j][i] = proof.f[u][j][i-1]
-                f[u][j][0] -= f[u][j][i]
+    # Random weights for verification
+    w1 = Scalar(0)
+    w2 = Scalar(0)
+    w3 = Scalar(0)
+    w4 = Scalar(0)
+    w5 = Scalar(0)
+    while (w1 == Scalar(0) or w2 == Scalar(0) or w3 == Scalar(0) or w4 == Scalar(0) or w5 == Scalar(0)):
+        w1 = random_scalar()
+        w2 = random_scalar()
+        w3 = random_scalar()
+        w4 = random_scalar()
+        w5 = random_scalar()
+
+    scalars = ScalarVector([])
+    points = PointVector([])
 
     # Recover hidden data if present
     if seed is not None:
         aux1 = zA - (hash_to_scalar(seed,M,P,Q,J,'rB')*x + hash_to_scalar(seed,M,P,Q,J,'rA'))
         aux2 = zC - (hash_to_scalar(seed,M,P,Q,J,'rC')*x + hash_to_scalar(seed,M,P,Q,J,'rD'))
 
-    # A/B check
+    # Reconstruct tensors
     for j in range(m):
         for u in range(w):
             f[u][j][0] = x
         for i in range(1,n):
             for u in range(w):
+                f[u][j][i] = proof.f[u][j][i-1]
                 f[u][j][0] -= f[u][j][i]
-    if not com_tensor(f,zA) == B*x + A:
-        raise ArithmeticError('Failed A/B check!')
 
-    # C/D check
     fx = [[[None for _ in range(n)] for _ in range(m)] for _ in range(w)]
     for j in range(m):
         for i in range(n):
             for u in range(w):
                 fx[u][j][i] = f[u][j][i]*(x-f[u][j][i])
-    if not com_tensor(fx,zC) == C*x + D:
-        raise ArithmeticError('Failed C/D check!')
 
-    # Commitment check
-    RX = dumb25519.Z
-    RY = dumb25519.Z
-    RZ = dumb25519.Z
-    mu = [hash_to_scalar(i,M,P,Q,J,A,B,C,D) for i in range(N)] # aggregation coefficients
+    # Gi, H
+    for j in range(m):
+        for i in range(n):
+            for u in range(w):
+                scalars.append(w1*f[u][j][i] + w2*fx[u][j][i])
+                points.append(hash_to_point('Gi',u,j,i))
+    scalars.append(w1*zA + w2*zC)
+    points.append(H)
+
+    # A, B, C, D
+    scalars.append(-w1)
+    points.append(A)
+    scalars.append(-w1*x)
+    points.append(B)
+    scalars.append(-w2*x)
+    points.append(C)
+    scalars.append(-w2)
+    points.append(D)
+
+    # M, P, U
+    U_scalar = Scalar(0)
+    mu = hash_to_scalar('Arcturus mu',M,P,Q,J,A,B,C,D)
     for i in range(N):
         t = [Scalar(1) for _ in range(w)]
         decomp_i = decompose(i,n,m)
         for j in range(m):
             for u in range(w):
                 t[u] *= f[u][j][decomp_i[j]]
+        sum_t = Scalar(0)
         for u in range(w):
-            RX += M[i]*t[u]*mu[i]
-            RY += U*t[u]*mu[i]
-            RZ += P[i]*t[u]
+            sum_t += t[u]
+        scalars.append(w3*sum_t*mu**i)
+        points.append(M[i])
+        scalars.append(w5*sum_t)
+        points.append(P[i])
+        U_scalar += w4*sum_t*mu**i
+    scalars.append(U_scalar)
+    points.append(U)
 
+    # X, Y, Z
     for j in range(m):
-        RX -= X[j]*x**j
-        RY -= Y[j]*x**j
-        RZ -= Z[j]*x**j
-    for u in range(w):
-        RX -= zR[u]*G
-        RY -= zR[u]*J[u]
-    T = dumb25519.Z
-    for j in range(len(Q)):
-        T += Q[j]
+        scalars.append(-w3*x**j)
+        points.append(X[j])
+        scalars.append(-w4*x**j)
+        points.append(Y[j])
+        scalars.append(-w5*x**j)
+        points.append(Z[j])
 
-    if not RX == dumb25519.Z:
-        raise ArithmeticError('Failed signing key check!')
-    if not RY == dumb25519.Z:
-        raise ArithmeticError('Failed linking check!')
-    if not RZ - T*x**m == zS*G:
-        raise ArithmeticError('Failed balance check!')
+    # G, J
+    G_scalar = Scalar(0)
+    for u in range(w):
+        G_scalar += zR[u]
+        scalars.append(-w4*zR[u])
+        points.append(J[u])
+    scalars.append(-w3*G_scalar - w5*zS)
+    points.append(G)
+
+    # Q
+    for j in range(len(Q)):
+        scalars.append(-w5*x**m)
+        points.append(Q[j])
+
+    if not dumb25519.multiexp(scalars,points) == dumb25519.Z:
+        raise ArithmeticError('Failed verification!')
 
     return aux1,aux2
