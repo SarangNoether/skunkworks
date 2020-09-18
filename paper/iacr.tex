@@ -138,13 +138,13 @@ Consider the following game between a challenger and a probabilistic polynomial-
 \begin{itemize}
 \item The challenger chooses $G,H \in \G$ uniformly at random and sends both to $\A$.
 \item $\A$ chooses and returns sets $\{G_i\}_{i=0}^{n-1},\{H_i\}_{i=0}^{n-1} \subset \G$ to the challenger.
-\item The challenger chooses a set $\{\mu_i\}_{i=0}^{n-1} \subset \F$ uniformly at random and sends it to $\A$.
+\item The challenger chooses a set $\{\mu^i\}_{i=0}^{n-1} \subset \F$ uniformly at random and sends it to $\A$.
 \item $\A$ chooses and returns a set $\{x_i\}_{i=0}^{n-1} \subset \F$ to the challenger.
 \end{itemize}
 We say that $\A$ wins the $(n,\epsilon,t)$-dual-target discrete logarithm game if, in time less than $t$ and with probability at least $\epsilon$, the following are true:
 \begin{itemize}
-\item $\sumi \mu_i \left( G_i - x_iG \right) = 0$
-\item $\sumi \mu_i \left( H - x_iH_i \right) = 0$
+\item $\sumi \mu^i \left( G_i - x_iG \right) = 0$
+\item $\sumi \mu^i \left( H - x_iH_i \right) = 0$
 \item There exists an index $0 \leq i < n$ such that either $x_iG \neq G_i$ or $x_iH_i \neq H$.
 \end{itemize}
 \end{definition}
@@ -176,9 +176,9 @@ Define $B \equiv \com(\sigma,r_B)$.
 \item For $0 \leq u < w$, define coefficients $\left\{p_{k,j}^{(u)}\right\}_{k,j=0}^{N-1,m-1}$ such that $$p_k^{(u)}(x) \equiv \prod_{j=0}^{m-1} \left( \sigma_{j,k}^{(u)}x + a_{j,k}^{(u)} \right) = \delta\left(l^{(u)},k\right)x^m + \sumj p_{k,j}^{(u)}x^j$$ (using our decomposition notation).
 Then define $p_{k,j} \equiv \sumu p_{k,j}^{(u)}$ and $p_k(x) \equiv \sumu p_k^{(u)}(x)$ accordingly.
 \item Select random $\left\{\rho_j\right\}_{j,u=0}^{m-1,w-1}, \left\{\overline{\rho}_j^{(u)}\right\}_{j,u=0}^{m-1,w-1} \subset \F$.
-\item Define aggregation coefficients $\{\mu_k\}_{k=0}^{N-1}$ using a $k$-indexed $\hs$ operation, containing all Fiat-Shamir transcript public parameters and proof elements.
-\item Define $\{X_j\}_{j=0}^{m-1} \subset \G$ such that: $$X_j \equiv \sumk p_{k,j}\mu_kM_k + \sumu \rho_j^{(u)}G$$
-\item Define $\{Y_j\}_{j=0}^{m-1} \subset \G$ such that: $$Y_j \equiv U \sumk p_{k,j}\mu_k + \sumu \rho_j^{(u)}J^{(u)}$$
+\item Set $\mu \equiv \hs(\{M_k\},\{P_k\},\{J^{(u)}\})$ (to include all public parameters as well).
+\item Define $\{X_j\}_{j=0}^{m-1} \subset \G$ such that: $$X_j \equiv \sumk p_{k,j}\mu^kM_k + \sumu \rho_j^{(u)}G$$
+\item Define $\{Y_j\}_{j=0}^{m-1} \subset \G$ such that: $$Y_j \equiv U \sumk p_{k,j}\mu^k + \sumu \rho_j^{(u)}J^{(u)}$$
 \item Define $\{Z_j\}_{j=0}^{m-1} \subset \G$ such that: $$Z_j \equiv \sumk p_{k,j}P_k + \sumu \overline{\rho}_j^{(u)}G$$
 \end{itemize}
 
@@ -199,7 +199,7 @@ $\underline{\mathcal{P}(\xi):}$
 \begin{itemize}
 \item Define $\left\{f_{j,i}^{(u)}\right\}_{i=1,j,u=0}^{n-1,m-1,w-1}$ such that $f_{j,i}^{(u)} \equiv \sigma_{j,i}^{(u)}\xi + a_{j,i}^{(u)}$.
 \item Define $z_A \equiv r_A + \xi r_B$ and $z_C \equiv \xi r_C + r_D$.
-\item Define $\left\{z_R^{(u)}\right\}_{u=0}^{w-1} \subset \F$ such that: $$z_R^{(u)} \equiv \mu_{l^{(u)}}r^{(u)}\xi^m - \sumj \rho_j^{(u)}\xi^j$$
+\item Define $\left\{z_R^{(u)}\right\}_{u=0}^{w-1} \subset \F$ such that: $$z_R^{(u)} \equiv \mu^{l^{(u)}}r^{(u)}\xi^m - \sumj \rho_j^{(u)}\xi^j$$
 \item Define: $$z_S \equiv \xi^m \left( \sumu s^{(u)} - \sum_{j=0}^{T-1} t_j \right) - \sumj \left( \xi^j \sumu \overline{\rho}_j^{(u)} \right)$$
 \end{itemize}
 
@@ -213,8 +213,8 @@ $\underline{\mathcal{V}:}$
 \begin{eqnarray}
 A + \xi B &=& \com(f,z_A) \label{eqn:ab} \\
 \xi C + D &=& \com(f(\xi-f),z_C) \label{eqn:cd} \\
-\sumk \mu_kM_k \left[ \sumu \left( \prod_{j=0}^{m-1} f_{j,k_j}^{(u)} \right) \right] - \sumj \xi^jX_j - \sumu z_R^{(u)}G &=& 0 \label{eqn:x} \\
-U \sumk \mu_k \left[ \sumu \left( \prod_{j=0}^{m-1} f_{j,k_j}^{(u)} \right) \right] - \sumj \xi^jY_j - \sumu z_R^{(u)}J^{(u)} &=& 0 \label{eqn:y} \\
+\sumk \mu^kM_k \left[ \sumu \left( \prod_{j=0}^{m-1} f_{j,k_j}^{(u)} \right) \right] - \sumj \xi^jX_j - \sumu z_R^{(u)}G &=& 0 \label{eqn:x} \\
+U \sumk \mu^k \left[ \sumu \left( \prod_{j=0}^{m-1} f_{j,k_j}^{(u)} \right) \right] - \sumj \xi^jY_j - \sumu z_R^{(u)}J^{(u)} &=& 0 \label{eqn:y} \\
 \sumk P_k \left[ \sumu \left( \prod_{j=0}^{m-1} f_{j,k_j}^{(u)} \right) \right] - \sumj \xi^jZ_j - \xi^m\sum_{j=0}^{T-1} Q_j - z_SG &=& 0 \label{eqn:z}
 \end{eqnarray}
 \end{itemize}
@@ -269,21 +269,21 @@ f_{j,i}^{(u)}\left( \xi - f_{j,i}^{(u)} \right) &=& \left( a_{j,i}^{(u)} + \xi\s
 
 Next, we show that Equation \ref{eqn:x} holds:
 \begin{eqnarray*}
-&& \sumk \mu_kM_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj \xi^jX_j - \sumu z^{(u)}_RG \\
-&=& \sumk \mu_kM_k p_k(\xi) - \sumj \xi^j \left( \sumk p_{k,j}\mu_kM_k + \sumu \rho^{(u)}_jG \right) - \sumu z^{(u)}_RG \\
-&=& \sumk \mu_kM_k \left( p_k(\xi) - \sumj \xi^j p_{k,j} \right) - \sumj \xi^j \sumu \rho^{(u)}_jG - \sumu z^{(u)}_RG \\
-&=& \sumk \mu_kM_k \left[ \xi^m \sumu \delta\left( l^{(u)},k \right) \right] - \sumj \xi^j \sumu \rho^{(u)}_jG - \sumu\left[ \mu_{l^{(u)}}r^{(u)}\xi^m - \sumj \rho^{(u)}_j\xi^j \right]G \\
-&=& \xi^m\sumu \mu_{l^{(u)}}r^{(u)}G - \sumj \xi^j \sumu \rho^{(u)}_jG - \xi^m\sumu \mu_{l^{(u)}}r^{(u)}G + \sumj \xi^j \sumu \rho^{(u)}_jG \\
+&& \sumk \mu^kM_k \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj \xi^jX_j - \sumu z^{(u)}_RG \\
+&=& \sumk \mu^kM_k p_k(\xi) - \sumj \xi^j \left( \sumk p_{k,j}\mu^kM_k + \sumu \rho^{(u)}_jG \right) - \sumu z^{(u)}_RG \\
+&=& \sumk \mu^kM_k \left( p_k(\xi) - \sumj \xi^j p_{k,j} \right) - \sumj \xi^j \sumu \rho^{(u)}_jG - \sumu z^{(u)}_RG \\
+&=& \sumk \mu^kM_k \left[ \xi^m \sumu \delta\left( l^{(u)},k \right) \right] - \sumj \xi^j \sumu \rho^{(u)}_jG - \sumu\left[ \mu^{l^{(u)}}r^{(u)}\xi^m - \sumj \rho^{(u)}_j\xi^j \right]G \\
+&=& \xi^m\sumu \mu^{l^{(u)}}r^{(u)}G - \sumj \xi^j \sumu \rho^{(u)}_jG - \xi^m\sumu \mu^{l^{(u)}}r^{(u)}G + \sumj \xi^j \sumu \rho^{(u)}_jG \\
 &=& 0
 \end{eqnarray*}
 
 Equation \ref{eqn:y} holds with similar algebra:
 \begin{eqnarray*}
-&& \sumk \mu_kU \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj \xi^jY_j - \sumu z^{(u)}_RJ^{(u)} \\
-&=& \sumk \mu_kU p_k(\xi) - \sumj \xi^j \left( \sumk p_{k,j}\mu_kU + \sumu \rho^{(u)}_jJ^{(u)} \right) - \sumu z^{(u)}_RJ^{(u)} \\
-&=& \sumk \mu_kU \left( p_k(\xi) - \sumj \xi^j p_{k,j} \right) - \sumj \xi^j \sumu \rho^{(u)}_jJ^{(u)} - \sumu z^{(u)}_RJ^{(u)} \\
-&=& \sumk \mu_kU \left[ \xi^m \sumu \delta\left( l^{(u)},k \right) \right] - \sumj \xi^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}U - \sumu\left[ \mu_{l^{(u)}}r^{(u)}\xi^m - \sumj \rho^{(u)}_j\xi^j \right](r^{(u)})^{-1}U \\
-&=& x^m\sumu \mu_{l^{(u)}}U - \sumj \xi^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}U - \xi^m\sumu \mu_{l^{(u)}}U + \sumj \xi^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}U \\
+&& \sumk \mu^kU \left[ \sumu \left( \prod_{j=0}^{m-1} f^{(u)}_{j,k_j} \right) \right] - \sumj \xi^jY_j - \sumu z^{(u)}_RJ^{(u)} \\
+&=& \sumk \mu^kU p_k(\xi) - \sumj \xi^j \left( \sumk p_{k,j}\mu^kU + \sumu \rho^{(u)}_jJ^{(u)} \right) - \sumu z^{(u)}_RJ^{(u)} \\
+&=& \sumk \mu^kU \left( p_k(\xi) - \sumj \xi^j p_{k,j} \right) - \sumj \xi^j \sumu \rho^{(u)}_jJ^{(u)} - \sumu z^{(u)}_RJ^{(u)} \\
+&=& \sumk \mu^kU \left[ \xi^m \sumu \delta\left( l^{(u)},k \right) \right] - \sumj \xi^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}U - \sumu\left[ \mu^{l^{(u)}}r^{(u)}\xi^m - \sumj \rho^{(u)}_j\xi^j \right](r^{(u)})^{-1}U \\
+&=& x^m\sumu \mu^{l^{(u)}}U - \sumj \xi^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}U - \xi^m\sumu \mu^{l^{(u)}}U + \sumj \xi^j \sumu \rho^{(u)}_j(r^{(u)})^{-1}U \\
 &=& 0
 \end{eqnarray*}
 
@@ -314,10 +314,10 @@ Hence the protocol is special honest verifier zero-knowledge.
 
 We claim that the protocol is $(m+1)$-special sound, where $m > 1$.
 To show this, we construct an extractor that, when given $m+1$ valid responses to $m+1$ distinct verifier challenges for the same initial statement, produces a valid witness for the statement.
-In particular, we produce a modified witness for the following relation that is based on the information presented in the prover algorithm, where we define aggregation coefficients $\mu_k$ as before:
+In particular, we produce a modified witness for the following relation that is based on the information presented in the prover algorithm, where we define $\mu$ as before:
 \begin{multline*}
 \mathcal{R}' \equiv \Bigg\{ \{M_k\}_{k=0}^{N-1},\{P_k\}_{k=0}^{N-1},\{J^{(u)}\}_{u=0}^{w-1},\{Q_j\}_{j=0}^{T-1} \subset \G \: ; \: \left( \{l^{(u)}\}_{u=0}^{w-1}, \{r^{(u)}\}_{u=0}^{w-1}, y \right) : \\
-\sumu \mu_{l^{(u)}} M_{l^{(u)}} = \sumu \mu_{l^{(u)}} r^{(u)}G \text{ and } \sumu \mu_{l^{(u)}} r^{(u)}J^{(u)} = \sumu \mu_{l^{(u)}} U \text{ and } \sum_{u=0}^{w-1} P_{l^{(u)}} - \sum_{j=0}^{T-1} Q_j = yG \Bigg\}
+\sumu \mu^{l^{(u)}} M_{l^{(u)}} = \sumu \mu^{l^{(u)}} r^{(u)}G \text{ and } \sumu \mu^{l^{(u)}} r^{(u)}J^{(u)} = \sumu \mu^{l^{(u)}} U \text{ and } \sum_{u=0}^{w-1} P_{l^{(u)}} - \sum_{j=0}^{T-1} Q_j = yG \Bigg\}
 \end{multline*}
 Observe that if we assume that the dual-target discrete logarithm problem is hard in $\G$ and $\hs$ is modeled as a random oracle, a witness for $\mathcal{R}'$ produced by the extractor must also be a witness for $\mathcal{R}$ using the same statement.
 This means that extraction of a witness for $\mathcal{R}'$ is sufficient to establish the desired soundness.
@@ -334,8 +334,8 @@ Extraction of $\{\sigma^{(u)}_{j,i}\}_{u=0}^{w-1}$ immediately yields the signin
 We have seen that $p_k$ is of degree $m$ only when $k \in \{l^{(u)}\}_{u=0}^{w-1}$.
 Hence there exist sets of coefficients $\{\overline{X}_j,\overline{Y}_j,\overline{Z}_j\}_{j=0}^{m-1}$, computed uniquely from the statement and extracted values, such that Equations \ref{eqn:x}, \ref{eqn:y}, and \ref{eqn:z} are of the following form:
 \begin{eqnarray*}
-\xi^m \sumu \mu_{l^{(u)}}M_{l^{(u)}} + \sumj \xi^j\overline{X}_j &=& \left( \sumu z^{(u)}_R \right)G \\
-\xi^m \sumu \mu_{l^{(u)}}U + \sumj \xi^j\overline{Y}_j &=& \sumu z^{(u)}_RJ^{(u)} \\
+\xi^m \sumu \mu^{l^{(u)}}M_{l^{(u)}} + \sumj \xi^j\overline{X}_j &=& \left( \sumu z^{(u)}_R \right)G \\
+\xi^m \sumu \mu^{l^{(u)}}U + \sumj \xi^j\overline{Y}_j &=& \sumu z^{(u)}_RJ^{(u)} \\
 \xi^m \sumu P_{l^{(u)}} + \sumj \xi^j\overline{Z}_j - \xi^m \sum_{j=0}^{T-1} Q_j &=& z_SG
 \end{eqnarray*}
 
@@ -344,11 +344,11 @@ Since all $\xi_e$ are distinct, the rows of $V$ span $\F^{m+1}$; hence there exi
 That is, $\sum_{e=0}^m \theta_e\xi_e^j = \delta(j,m)$.
 
 For each of the previous three equations, we can therefore build a linear combination over $e$. For the first:
-$$\sumu \mu_{l^{(u)}} M_{l^{(u)}} = \sum_{e=0}^m \theta_e\xi_e^m \left( \sumu \mu_{l^{(u)}} M_{l^{(u)}} \right) + \sum_{e=0}^m \theta_e \left( \sumj \xi_e^j \overline{X}_j \right) = \sumu \left( \sum_{e=0}^m \theta_e {}_ez^{(u)}_R \right) G$$
+$$\sumu \mu^{l^{(u)}} M_{l^{(u)}} = \sum_{e=0}^m \theta_e\xi_e^m \left( \sumu \mu^{l^{(u)}} M_{l^{(u)}} \right) + \sum_{e=0}^m \theta_e \left( \sumj \xi_e^j \overline{X}_j \right) = \sumu \left( \sum_{e=0}^m \theta_e {}_ez^{(u)}_R \right) G$$
 We therefore can define extractions for each $r^{(u)}$:
-$$r^{(u)} \equiv \frac{1}{\mu_{l^{(u)}}} \sum_{e=0}^m \theta_e {}_ez^{(u)}_R$$
+$$r^{(u)} \equiv \frac{1}{\mu^{l^{(u)}}} \sum_{e=0}^m \theta_e {}_ez^{(u)}_R$$
 Observe that the same witnesses appear in the second:
-$$\sumu \mu_{l^{(u)}} U = \sum_{e=0}^m \theta_e\xi_e^m \left( \sumu \mu_{l^{(u)}} U \right) + \sum_{e=0}^m \theta_e \left( \sumj \xi_e^j \overline{Y}_j \right) = \sumu \left( \sum_{e=0}^m \theta_e {}_ez^{(u)}_R \right) J^{(u)}$$
+$$\sumu \mu^{l^{(u)}} U = \sum_{e=0}^m \theta_e\xi_e^m \left( \sumu \mu^{l^{(u)}} U \right) + \sum_{e=0}^m \theta_e \left( \sumj \xi_e^j \overline{Y}_j \right) = \sumu \left( \sum_{e=0}^m \theta_e {}_ez^{(u)}_R \right) J^{(u)}$$
 This means the requirements on each $r^{(u)}$ are satisfied. The third equation proceeds similarly.
 $$\sumu P_{l^{(u)}} - \sum_{j=0}^{T-1} Q_j = \sum_{e=0}^m \theta_e\xi_e^m \left( \sumu P_{l^{(u)}} - \sum_{j=0}^{T-1} Q_j \right) + \sum_{e=0}^m \theta_e \left( \sumj \xi_e^j \overline{Z}_j \right) = \left( \sum_{e=0}^m \theta_e {}_ez_S  \right)G$$
 Hence we have $y \equiv \sum_{e=0}^m \theta_e {}_ez_S$.
