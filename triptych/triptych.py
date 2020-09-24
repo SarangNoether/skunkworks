@@ -50,23 +50,43 @@ def com_matrix(v,r):
     C += r*H
     return C
 
-# Decompose a value with given base and size
-def decompose(val,base,size,t=int):
-    r = []
-    for i in range(size-1,-1,-1):
-        slot = base**i
-        r.append(int(val/slot))
-        val -= slot*r[-1]
-    r = list(reversed(r))
+# Generator for Gray codes
+# INPUT
+#   N: base
+#   K number of digits
+#   v (optional): if given, the specific value needed
+# OUTPUT
+#   generator for iterated Gray codes
+# NOTES
+#   The initial value is always a series of zeros.
+#   The generator returns the changed digit, the old value, and the value to which it is changed.
+#   To iterate, change the given digit to the given value.
+#   This is useful for efficiently computing coefficients during the verification process.
+#   If a value is provided, the iterator will only return that value's Gray code (not the changes)
+def gray(N,K,v=None):
+    g = [0 for _ in range(K+1)]
+    u = [1 for _ in range(K+1)]
+    changed = [0,0,0] # index, old digit, new digit
 
-    # Return int list or Scalar list
-    if t == int:
-        return r
+    for idx in range(N**K):
+        # Standard iterator
+        if v is None:
+            yield changed
+        # Specific value
+        else:
+            if idx == v:
+                yield g[:-1] # return the given Gray code
+            if idx > v:
+                raise StopIteration # once we have the code, we're done
 
-    s = []
-    for i in r:
-        s.append(Scalar(i))
-    return s
+        i = 0
+        k = g[0] + u[0]
+        while (k >= N or k < 0):
+            u[i] = -u[i]
+            i += 1
+            k = g[i] + u[i]
+        changed = [i,g[i],k]
+        g[i] = k
 
 # Kronecker delta
 def delta(x,y):
@@ -101,7 +121,7 @@ def convolve(x,y):
 # RETURNS
 #  proof structure
 def prove(M,P,l,r,s,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
-    n = 2 # binary decomposition
+    n = 2 # decomposition base
     tr = transcript.Transcript('Triptych single-input')
 
     # Commitment list size check
@@ -131,8 +151,8 @@ def prove(M,P,l,r,s,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
             a[j][0] -= a[j][i]
     A = com_matrix(a,rA)
 
-    # Commit to decomposition bits
-    decomp_l = decompose(l,n,m)
+    # Commit to decomposition digits
+    decomp_l = next(gray(n,m,l))
     sigma = [[None for _ in range(n)] for _ in range(m)]
     for j in range(m):
         for i in range(n):
@@ -155,8 +175,9 @@ def prove(M,P,l,r,s,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
 
     # Compute p coefficients
     p = [[] for _ in range(N)]
-    for k in range(N):
-        decomp_k = decompose(k,n,m)
+    decomp_k = [0]*m
+    for k,gray_update in enumerate(gray(n,m)):
+        decomp_k[gray_update[0]] = gray_update[2]
         p[k] = [a[0][decomp_k[0]],delta(decomp_l[0],decomp_k[0])]
         
         for j in range(1,m):
@@ -295,12 +316,17 @@ def verify(M,P,proof,m):
     # Commitment check
     RX = dumb25519.Z
     RY = dumb25519.Z
-    for i in range(N):
-        t = Scalar(1)
-        decomp_i = decompose(i,n,m)
-        for j in range(m):
-            t *= f[j][decomp_i[j]]
-        RX += (M[i] + mu*P[i])*t
+
+    # Initial coefficient product (always zero-index values)
+    t = Scalar(1)
+    for j in range(m):
+        t *= f[j][0]
+
+    for k,gray_update in enumerate(gray(n,m)):
+        # Update the coefficient product
+        if k > 0: # we already have the `k=0` value!
+            t *= f[gray_update[0]][gray_update[1]].invert()*f[gray_update[0]][gray_update[2]]
+        RX += (M[k] + mu*P[k])*t
         RY += (U + mu*K)*t
 
     for j in range(m):
