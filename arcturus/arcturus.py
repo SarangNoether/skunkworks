@@ -54,23 +54,43 @@ def com_tensor(v,r):
     C += r*H
     return C
 
-# Decompose a value with given base and size
-def decompose(val,base,size,t=int):
-    r = []
-    for i in range(size-1,-1,-1):
-        slot = base**i
-        r.append(int(val/slot))
-        val -= slot*r[-1]
-    r = list(reversed(r))
+# Generator for Gray codes
+# INPUT
+#   N: base
+#   K: number of digits
+#   v (optional): if given, the specific value needed
+# OUTPUT
+#   generator for iterated Gray codes
+# NOTES
+#   The initial value is always a series of zeros.
+#   The generator returns the changed digit, the old value, and the value to which it is changed.
+#   To iterate, change the given digit to the given value.
+#   This is useful for efficiently computing coefficients during the verification process.
+#   If a value is provided, the iterator will only return that value's Gray code (not the changes)
+def gray(N,K,v=None):
+    g = [0 for _ in range(K+1)]
+    u = [1 for _ in range(K+1)]
+    changed = [0,0,0] # index, old digit, new digit
 
-    # Return int list or Scalar list
-    if t == int:
-        return r
+    for idx in range(N**K):
+        # Standard iterator
+        if v is None:
+            yield changed
+        # Specific value
+        else:
+            if idx == v:
+                yield g[:-1] # return the given Gray code
+            if idx > v:
+                raise StopIteration # once we have the code, we're done
 
-    s = []
-    for i in r:
-        s.append(Scalar(i))
-    return s
+        i = 0
+        k = g[0] + u[0]
+        while (k >= N or k < 0):
+            u[i] = -u[i]
+            i += 1
+            k = g[i] + u[i]
+        changed = [i,g[i],k]
+        g[i] = k
 
 # Kronecker delta
 def delta(x,y):
@@ -109,7 +129,7 @@ def convolve(x,y):
 # RETURNS
 #  proof structure
 def prove(M,P,Q,l,r,s,t,a,b,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
-    n = 2 # binary decomposition
+    n = 2 # decomposition base
     tr = transcript.Transcript('Arcturus')
 
     # Commitment list size check
@@ -150,10 +170,10 @@ def prove(M,P,Q,l,r,s,t,a,b,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
                 a[u][j][0] -= a[u][j][i]
     A = com_tensor(a,rA)
 
-    # Commit to decomposition bits
+    # Commit to decomposition digits
     decomp_l = []
     for u in range(w):
-        decomp_l.append(decompose(l[u],n,m))
+        decomp_l.append(next(gray(n,m,l[u])))
     sigma = [[[None for _ in range(n)] for _ in range(m)] for _ in range(w)]
     for j in range(m):
         for i in range(n):
@@ -179,8 +199,9 @@ def prove(M,P,Q,l,r,s,t,a,b,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
 
     # Compute p coefficients
     p = [[[] for _ in range(N)] for _ in range(w)]
-    for k in range(N):
-        decomp_k = decompose(k,n,m)
+    decomp_k = [0]*m
+    for k,gray_update in enumerate(gray(n,m)):
+        decomp_k[gray_update[0]] = gray_update[2]
         for u in range(w):
             p[u][k] = [a[u][0][decomp_k[0]],delta(decomp_l[u][0],decomp_k[0])]
         
@@ -372,20 +393,26 @@ def verify(M,P,Q,proof,m):
     # M, P, U
     U_scalar = Scalar(0)
     mu = hash_to_scalar('Arcturus mu',M,P,Q,J,A,B,C,D)
-    for i in range(N):
-        t = [Scalar(1) for _ in range(w)]
-        decomp_i = decompose(i,n,m)
-        for j in range(m):
+
+    # Initial coefficient product (always zero-index values)
+    t = [Scalar(1) for _ in range(w)]
+    for j in range(m):
+        for u in range(w):
+            t[u] *= f[u][j][0]
+
+    for k,gray_update in enumerate(gray(n,m)):
+        # Update the coefficient product
+        if k > 0: # we already have the `k=0` value!
             for u in range(w):
-                t[u] *= f[u][j][decomp_i[j]]
+                t[u] *= f[u][gray_update[0]][gray_update[1]].invert()*f[u][gray_update[0]][gray_update[2]]
         sum_t = Scalar(0)
         for u in range(w):
             sum_t += t[u]
-        scalars.append(w3*sum_t*mu**i)
-        points.append(M[i])
+        scalars.append(w3*sum_t*mu**k)
+        points.append(M[k])
         scalars.append(w5*sum_t)
-        points.append(P[i])
-        U_scalar += w4*sum_t*mu**i
+        points.append(P[k])
+        U_scalar += w4*sum_t*mu**k
     scalars.append(U_scalar)
     points.append(U)
 
