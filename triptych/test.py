@@ -12,26 +12,31 @@ class TestValidProofs(unittest.TestCase):
         print ''
 
         for m in [2,3]: # ring size 4,8
-            print 'Test parameter (m):',m
-            l = random.randrange(2**m) # spend index
-            r = random_scalar() # signing key
-            s = random_scalar() # commitment key
+            for w in [1,2]: # number of proofs in batch
+                print 'Test parameter (m,w):',m,w
+                l = random.sample(range(2**m),w) # spend indices
+                r = [random_scalar() for _ in range(w)] # signing key
+                s = [random_scalar() for _ in range(w)] # commitment key
 
-            # Data to hide
-            seed = random_scalar()
-            aux1 = random_scalar()
-            aux2 = random_scalar()
+                # Data to hide
+                seed = [random_scalar() for _ in range(w)]
+                aux1 = [random_scalar() for _ in range(w)]
+                aux2 = [random_scalar() for _ in range(w)]
 
-            # Set keys and commitments
-            M = [random_point() for _ in range(2**m)] # possible signing keys
-            P = [random_point() for _ in range(2**m)] # corresponding commitments
-            M[l] = r*G
-            P[l] = s*G
+                # Set keys and run proofs
+                M = [random_point() for _ in range(2**m)] # possible signing keys
+                P = [random_point() for _ in range(2**m)] # corresponding commitments
+                proofs = []
+                for u in range(w):
+                    M[l[u]] = r[u]*G
+                    P[l[u]] = s[u]*G
+                for u in range(w):
+                    proofs.append(triptych.prove(M,P,l[u],r[u],s[u],m,seed[u],aux1[u],aux2[u]))
 
-            # Run test
-            proof = triptych.prove(M,P,l,r,s,m,seed,aux1,aux2)
-            aux1_,aux2_ = triptych.verify(M,P,proof,m)
-            self.assertEqual(aux1,aux1_)
-            self.assertEqual(aux2,aux2_)
+                # Verify all proofs in batch
+                aux = triptych.verify(M,P,proofs,m)
+                for u in range(w):
+                    self.assertEqual(aux1[u],aux[u][0])
+                    self.assertEqual(aux2[u],aux[u][1])
 
 unittest.TextTestRunner(verbosity=2,failfast=True).run(unittest.TestLoader().loadTestsFromTestCase(TestValidProofs))

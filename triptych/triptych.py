@@ -1,7 +1,4 @@
-# Proof-of-concept implementation of https://github.com/monero-project/research-lab/issues/56
-
-from dumb25519 import hash_to_point, random_scalar, Scalar, hash_to_scalar, G, random_point, Z
-import dumb25519
+from dumb25519 import Scalar, Point, ScalarVector, PointVector, hash_to_scalar, hash_to_point, random_scalar, Z, G, multiexp
 import random
 import transcript
 
@@ -43,10 +40,10 @@ class Proof:
 
 # Pedersen matrix commitment
 def com_matrix(v,r):
-    C = dumb25519.Z
-    for i in range(len(v)):
-        for j in range(len(v[0])):
-            C += hash_to_point('Gi',i,j)*v[i][j]
+    C = Z
+    for j in range(len(v)):
+        for i in range(len(v[0])):
+            C += hash_to_point('Gi',j,i)*v[j][i]
     C += r*H
     return C
 
@@ -122,7 +119,7 @@ def convolve(x,y):
 #  proof structure
 def prove(M,P,l,r,s,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
     n = 2 # decomposition base
-    tr = transcript.Transcript('Triptych single-input')
+    tr = transcript.Transcript('Triptych proof')
 
     # Commitment list size check
     if not len(M) == n**m or not len(P) == n**m:
@@ -165,7 +162,7 @@ def prove(M,P,l,r,s,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
         for i in range(n):
             a_sigma[j][i] = a[j][i]*(Scalar(1) - Scalar(2)*sigma[j][i])
     C = com_matrix(a_sigma,rC)
-    
+
     # Commit to squared a-values
     a_sq = [[Scalar(0) for _ in range(n)] for _ in range(m)]
     for j in range(m):
@@ -179,13 +176,13 @@ def prove(M,P,l,r,s,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
     for k,gray_update in enumerate(gray(n,m)):
         decomp_k[gray_update[0]] = gray_update[2]
         p[k] = [a[0][decomp_k[0]],delta(decomp_l[0],decomp_k[0])]
-        
+
         for j in range(1,m):
             p[k] = convolve(p[k],[a[j][decomp_k[j]],delta(decomp_l[j],decomp_k[j])])
 
     # Generate proof values
-    X = [dumb25519.Z for _ in range(m)]
-    Y = [dumb25519.Z for _ in range(m)]
+    X = [Z for _ in range(m)]
+    Y = [Z for _ in range(m)]
     rho = [random_scalar() for _ in range(m)]
     mu = hash_to_scalar(M,P,J,K,A,B,C,D)
     for j in range(m):
@@ -240,104 +237,162 @@ def prove(M,P,l,r,s,m,seed=None,aux1=Scalar(0),aux2=Scalar(0)):
 
     return proof
 
-# Verify a commitment-to-zero proof
+# Verify a batch of commitment-to-zero proofs with common input keys
 #
 # INPUT
 #  M: public key list
 #  P: input commitment list
-#  proof: proof structure
+#  proofs: list of proof structures
 #  m: dimension such that len(M) = len(P) == 2**m
 # RETURNS
-#  auxiliary data if the proof is valid
-def verify(M,P,proof,m):
+#  list of auxiliary data if the proofs are valid
+def verify(M,P,proofs,m):
     if not m > 1:
         raise ValueError('Must have m > 1!')
 
     n = 2
     N = n**m
-    tr = transcript.Transcript('Triptych single-input')
 
-    J = proof.J
-    K = proof.K
-    A = proof.A
-    B = proof.B
-    C = proof.C
-    D = proof.D
-    X = proof.X
-    Y = proof.Y
-    f = [[None for _ in range(n)] for _ in range(m)]
-    zA = proof.zA
-    zC = proof.zC
-    z = proof.z
-    seed = proof.seed
+    # Weighted scalars
+    Gi_scalars = [[Scalar(0) for _ in range(n)] for _ in range(m)]
+    H_scalar = Scalar(0)
+    G_scalar = Scalar(0)
+    U_scalar = Scalar(0)
+    Mk_scalars = [Scalar(0) for _ in range(N)]
+    Pk_scalars = [Scalar(0) for _ in range(N)]
 
-    # Fiat-Shamir transcript challenge
-    mu = hash_to_scalar(M,P,J,K,A,B,C,D)
-    tr.update(M)
-    tr.update(P)
-    tr.update(J)
-    tr.update(K)
-    tr.update(A)
-    tr.update(B)
-    tr.update(C)
-    tr.update(D)
-    tr.update(X)
-    tr.update(Y)
-    x = tr.challenge()
+    # Final check
+    scalars = ScalarVector([])
+    points = PointVector([])
 
-    # Reconstruct matrix
-    for j in range(m):
-        f[j][0] = x
-        for i in range(1,n):
-            f[j][i] = proof.f[j][i-1]
-            f[j][0] -= f[j][i]
+    # Embedded data
+    aux = []
 
-    # Recover hidden data if present
-    if seed is not None:
-        aux1 = zA - (hash_to_scalar(seed,M,P,J,K,'rB')*x + hash_to_scalar(seed,M,P,J,K,'rA'))
-        aux2 = zC - (hash_to_scalar(seed,M,P,J,K,'rC')*x + hash_to_scalar(seed,M,P,J,K,'rD'))
+    for proof in proofs:
+        # Weights
+        w1 = Scalar(0)
+        w2 = Scalar(0)
+        w3 = Scalar(0)
+        w4 = Scalar(0)
+        while w1 == Scalar(0) or w2 == Scalar(0) or w3 == Scalar(0) or w4 == Scalar(0):
+            w1 = random_scalar()
+            w2 = random_scalar()
+            w3 = random_scalar()
+            w4 = random_scalar()
 
-    # A/B check
-    for j in range(m):
-        f[j][0] = x
-        for i in range(1,n):
-            f[j][0] -= f[j][i]
-    if not com_matrix(f,zA) == B*x + A:
-        raise ArithmeticError('Failed A/B check!')
+        tr = transcript.Transcript('Triptych proof')
 
-    # C/D check
-    fx = [[None for _ in range(n)] for _ in range(m)]
+        J = proof.J
+        K = proof.K
+        A = proof.A
+        B = proof.B
+        C = proof.C
+        D = proof.D
+        X = proof.X
+        Y = proof.Y
+        f = [[None for _ in range(n)] for _ in range(m)]
+        zA = proof.zA
+        zC = proof.zC
+        z = proof.z
+        seed = proof.seed
+
+        # Fiat-Shamir transcript challenge
+        mu = hash_to_scalar(M,P,J,K,A,B,C,D)
+        tr.update(M)
+        tr.update(P)
+        tr.update(J)
+        tr.update(K)
+        tr.update(A)
+        tr.update(B)
+        tr.update(C)
+        tr.update(D)
+        tr.update(X)
+        tr.update(Y)
+        x = tr.challenge()
+
+        # Reconstruct matrix
+        for j in range(m):
+            f[j][0] = x
+            for i in range(1,n):
+                f[j][i] = proof.f[j][i-1]
+                f[j][0] -= f[j][i]
+
+        # Recover hidden data if present
+        aux1 = None
+        aux2 = None
+        if seed is not None:
+            aux1 = zA - (hash_to_scalar(seed,M,P,J,K,'rB')*x + hash_to_scalar(seed,M,P,J,K,'rA'))
+            aux2 = zC - (hash_to_scalar(seed,M,P,J,K,'rC')*x + hash_to_scalar(seed,M,P,J,K,'rD'))
+        aux.append([aux1,aux2])
+
+        # Gi
+        for j in range(m):
+            for i in range(n):
+                Gi_scalars[j][i] += w1*f[j][i] + w2*f[j][i]*(x - f[j][i])
+
+        # H
+        H_scalar += w1*zA + w2*zC
+
+        # A,B,C,D
+        scalars.append(-w1)
+        points.append(A)
+        scalars.append(-w1*x)
+        points.append(B)
+        scalars.append(-w2*x)
+        points.append(C)
+        scalars.append(-w2)
+        points.append(D)
+
+        # Initial coefficient product (always zero-index values)
+        t = Scalar(1)
+        sum_t = Scalar(0)
+        for j in range(m):
+            t *= f[j][0]
+        
+        # M,P
+        for k,gray_update in enumerate(gray(n,m)):
+            # Update the coefficient product
+            if k > 0: # we already have the `k=0` value!
+                t *= f[gray_update[0]][gray_update[1]].invert()*f[gray_update[0]][gray_update[2]]
+            sum_t += t
+            Mk_scalars[k] += w3*t
+            Pk_scalars[k] += w3*t*mu
+
+        # U,K
+        U_scalar += w4*sum_t
+        scalars.append(w4*sum_t*mu)
+        points.append(K)
+
+        # X,Y
+        for j in range(m):
+            scalars.append(-w3*x**j)
+            points.append(X[j])
+            scalars.append(-w4*x**j)
+            points.append(Y[j])
+
+        # G,J
+        G_scalar -= w3*z
+        scalars.append(-w4*z)
+        points.append(J)
+
+    # Assemble common points
     for j in range(m):
         for i in range(n):
-            fx[j][i] = f[j][i]*(x-f[j][i])
-    if not com_matrix(fx,zC) == C*x + D:
-        raise ArithmeticError('Failed C/D check!')
+            scalars.append(Gi_scalars[j][i])
+            points.append(hash_to_point('Gi',j,i))
+    for k in range(N):
+        scalars.append(Mk_scalars[k])
+        points.append(M[k])
+        scalars.append(Pk_scalars[k])
+        points.append(P[k])
+    scalars.append(G_scalar)
+    points.append(G)
+    scalars.append(H_scalar)
+    points.append(H)
+    scalars.append(U_scalar)
+    points.append(U)
 
-    # Commitment check
-    RX = dumb25519.Z
-    RY = dumb25519.Z
+    if not multiexp(scalars,points) == Z:
+        raise ArithmeticError('Failed verification!')
 
-    # Initial coefficient product (always zero-index values)
-    t = Scalar(1)
-    for j in range(m):
-        t *= f[j][0]
-
-    for k,gray_update in enumerate(gray(n,m)):
-        # Update the coefficient product
-        if k > 0: # we already have the `k=0` value!
-            t *= f[gray_update[0]][gray_update[1]].invert()*f[gray_update[0]][gray_update[2]]
-        RX += (M[k] + mu*P[k])*t
-        RY += (U + mu*K)*t
-
-    for j in range(m):
-        RX -= X[j]*x**j
-        RY -= Y[j]*x**j
-    RX -= z*G
-    RY -= z*J
-
-    if not RX == dumb25519.Z:
-        raise ArithmeticError('Failed signing key check!')
-    if not RY == dumb25519.Z:
-        raise ArithmeticError('Failed linking check!')
-
-    return aux1,aux2
+    return aux
