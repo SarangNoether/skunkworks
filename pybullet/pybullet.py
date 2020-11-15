@@ -23,7 +23,7 @@ class Bulletproof:
 
 # Data for a round of the inner product argument
 class InnerProductRound:
-    def __init__(self,Gi,Hi,G,H,P,a,b,alpha,y,tr,seed):
+    def __init__(self,Gi,Hi,G,H,a,b,alpha,y,tr,seed):
         # Common data
         self.Gi = Gi
         self.Hi = Hi
@@ -209,13 +209,6 @@ def prove(data,N,seed=None,aux=None):
         for i in range(N):
             d.append(z**(2*(j+1))*Scalar(2)**i)
 
-    # Build the proof element incrementally
-    Ahat = A*Scalar(8) - Gi**(one_MN*z)
-    Ahat += Hi**(d*exp_scalar(y,M*N,desc=True) + one_MN*z)
-    for j in range(M):
-        Ahat += V[j]*Scalar(8)*(z**(2*(j+1))*y**(M*N+1))
-    Ahat += H*(one_MN**exp_scalar(y,M*N)*z - one_MN**d*y**(M*N+1)*z - one_MN**exp_scalar(y,M*N)*z**2)
-
     # Prepare for inner product
     aL1 = aL - one_MN*z
     aR1 = aR + d*exp_scalar(y,M*N,desc=True) + one_MN*z
@@ -225,7 +218,7 @@ def prove(data,N,seed=None,aux=None):
         alpha1 += z**(2*(j+1))*gamma*y**(M*N+1)
 
     # Initial inner product inputs
-    ip_data = InnerProductRound(Gi,Hi,G,H,Ahat,aL1,aR1,alpha1,y,tr,seed)
+    ip_data = InnerProductRound(Gi,Hi,G,H,aL1,aR1,alpha1,y,tr,seed)
     while True:
         inner_product(ip_data)
 
